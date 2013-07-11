@@ -1,8 +1,18 @@
-var window, document, R11 = {};
-R11 = (function () {
+// var window, document;   // this breaks IE10....of course
+
+// Gerber Collision auto repair - 301-474-4844
+// this is Hanover Insurance's repair shop. They will make an estimate and then contact for a repair date
+// Ceena from Hanover - 800-628-0250 ext.4317
+// claim #1500113140
+// I will need to contact them about a rental if needed.
+// 11am appointment
+// Craig
+
+var  AR = {};
+AR.R11 = (function () {
     "use strict";
     var state,
-        zoom = 4,    //  how zoomed in the image begins
+        zoom = 3,    //  how zoomed in the image begins
         gz = zoom,   // selection level - as relates to zoom.  1, 2, 4, 8, 16 pixels, etc.
         bit,        // grid width
         zbit = Math.pow(2, zoom),
@@ -13,14 +23,117 @@ R11 = (function () {
         sw = 20, // setting width
         twoPI = Math.PI * 2,
         radians = Math.PI / 180,
-        curX = 0,
-        curY = 0,
-      //  shift = Math.round(50 / zoom),
+        curX = w / 2.5 | 0,
+        curY = h / 2.5 | 0,
         shift = 1,
         curColor = [0, 0, 0, 1],
         fillStyle = "rgba(" + curColor[0] + "," + curColor[1] + "," + curColor[2] + "," + curColor[3] + " )",
         updateFill = function () {
             fillStyle = "rgba(" + curColor[0] + "," + curColor[1] + "," + curColor[2] + "," + curColor[3] + " )";
+        },
+        DummyData = function () {
+            this.hold = 0;
+            this.lStickX = 0;
+            this.lStickY = 0;
+            this.rStickX = 0;
+            this.rStickY = 0;
+            
+            this.gyroX = 0;
+            this.gyroY = 0;
+            this.gyroZ = 0;
+            this.angleX = 0;
+            this.angleY = 0;
+            this.angleZ = 0;
+            this.accX = 0;
+            this.accY = 0;
+            this.accZ = 0;
+    
+            this.dirXx = 1.0;
+            this.dirXy = 0.0;
+            this.dirXz = 0.0;
+            this.dirYx = 0.0;
+            this.dirYy = 1.0;
+            this.dirYz = 0.0;
+            this.dirZx = 0.0;
+            this.dirZy = 0.0;
+            this.dirZz = 1.0;
+            
+            this.tpTouch = 0;
+            this.tpValidity = 0;
+            this.contentX = 0;
+            this.contentY = 0;
+        },
+        Controls = function () {
+                        
+            if (window.wiiu) {
+                
+                this.state = function () {
+                    return window.wiiu.gamepad.update();
+                };
+                this.event = function () {
+                    return this.state.hold & 0x7f86fffc;
+                };
+                
+                this.zoomin = 0x00000008; // + sign
+                this.zoomout = 0x00000004; // - sign
+                
+                this.grid = {
+                    expand: 0x00000200, // up
+                    reduce: 0x00000100, // down
+                    on: 0x00040000, // lclick
+                    off: 0x00020000, // rclick
+                    toggle: null //
+                };
+                
+                this.eraser = {
+                    on: 0x00000800,
+                    off: 0x00000400 // right
+                };
+                
+                this.ball = {
+                    on: 0x00008000,  // A button
+                    off: 0x00000010 // R shoulder
+                };
+                
+                this.save = null;
+                this.settings = 0x00002000; // ?
+                
+                // rstick
+                this.left =  0x04000000;
+                this.right = 0x02000000;
+                this.up = 0x01000000;
+                this.down = 0x00800000;
+                
+            } else {
+                
+                this.state = new DummyData;
+                this.event = this.state.hold;
+                
+                this.zoomin = 76; // l
+                this.zoomout = 75; // k
+                
+                this.grid = {
+                    expand: 190, // period
+                    reduce: 188, // comma
+                    on: null, // 
+                    off: null, // 
+                    toggle: 71 // G
+                };
+                
+                this.eraser = {
+                    on: 81, // Q
+                    off: 87 // W
+                };
+
+                this.ball = {
+                    on: 66, // B
+                    off: 66 // B
+                };
+                
+                this.save = 83; // S
+                this.settings = null;
+            }
+            
         },
         flag = {
             mousedown: 0,
@@ -71,7 +184,7 @@ R11 = (function () {
             ctx = cv.getContext("2d");
             cv.width = w;
             cv.height = h;
-            cv.style.zIndex = z;  // create function to check if z/id is currently in use by another element
+            cv.style.zIndex = (z) ? z: 1;  // create function to check if z/id is currently in use by another element
             cv.style.left = "0";
             cv.style.top = "0";
             cv.style.position = "absolute";
@@ -90,44 +203,14 @@ R11 = (function () {
             data[index + 2] = b;
             data[index + 3] = a;
         },
-        DummyData = function () {
-            this.hold = 0;
-            this.lStickX = 0;
-            this.lStickY = 0;
-            this.rStickX = 0;
-            this.rStickY = 0;
-            
-            this.gyroX = 0;
-            this.gyroY = 0;
-            this.gyroZ = 0;
-            this.angleX = 0;
-            this.angleY = 0;
-            this.angleZ = 0;
-            this.accX = 0;
-            this.accY = 0;
-            this.accZ = 0;
-    
-            this.dirXx = 1.0;
-            this.dirXy = 0.0;
-            this.dirXz = 0.0;
-            this.dirYx = 0.0;
-            this.dirYy = 1.0;
-            this.dirYz = 0.0;
-            this.dirZx = 0.0;
-            this.dirZy = 0.0;
-            this.dirZz = 1.0;
-            
-            this.tpTouch = 0;
-            this.tpValidity = 0;
-            this.contentX = 0;
-            this.contentY = 0;
-        },
+
         exportImage = function (id) {
             var canvas = document.getElementById(id).toDataURL("image/png");
             window.open(canvas);
         },
         drawReal = function (ctx, data, x, y, xbit, ybit) {
             var check, curPixel;
+            ctx.save();
             for (var a = 0; a <= xbit; a += 1) {
                 for (var b = 0; b <= ybit; b += 1) {
                     curPixel = getPixel(x + a, y + b);
@@ -140,9 +223,30 @@ R11 = (function () {
                     }
                 }
             }
+            ctx.restore();
         },
         closeW = 25,
         closeH = 30,
+        next1 = function (x, mx, min) {
+            mx = mx || 100;
+            min = min || 0;
+            x = (x < min) ? min:
+                (x < mx) ? x + 1:
+                mx;
+            return x;
+        },
+        back1 = function (x, min, mx) {
+            mx = mx || 100;
+            min = min || 0;
+            x = (x > mx) ? mx:
+                (x > min) ? x - 1:
+                min;
+            return x;
+        },
+        contains = function(box, x, y) {
+            return  (box.x <= x) && (box.x + box.w >= x) &&
+                    (box.y <= y) && (box.y + box.h >= y);
+        },
         xBox = function (ctx, x, y) {
             var inset = 2;
             ctx.fillStyle = "white";
@@ -158,27 +262,24 @@ R11 = (function () {
             ctx.lineTo(x + inset, y + closeH - inset);
             ctx.closePath();
             ctx.stroke();
-        };
-    return {
-        text: function (txt, ctx, x, y, c, s, a, sp, thick, ornt) {
+        },
+        customFont = function (txt, ctx, x, y, color, size, spacing, thick, horizontal) {
             var i, a1, a2, a3, a4, a5, a6, a7, a8,
                 x1, x2, x3, x4, x5, x6,
                 y1, y2, y3, y4, y5, y6,
                 low = txt.toLowerCase(),
-                split = low.split(""),
+                split = txt.toLowerCase().split(""),
                 num = split.length,
-                space = sp || 3,  // leading
-                f = s || 10,  // font size
-                an = a || 0,  // angle
-                ang = Math.PI * a,
-                color = c || "black",
+                space,  // leading
+                f = size || 10,  // font size
+                ang = (horizontal) ? 0: Math.PI * 0.5,
                 lw = thick || 5,
                 d = lw / 2; // this variable shifts the
-            ctx.fillStyle = color;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = lw;
-            for (i = 0; i < num ; i += 1) {
-                space = sp || 3;
+            ctx.fillStyle = color || "black";
+            ctx.strokeStyle = color || "black";
+            ctx.lineWidth = thick || 5;
+            for (i = 0; i != num ; i += 1) {
+                space = spacing || 3;
                 ctx.save();
                 ctx.translate(x + 0.5, y + 0.5);
                 ctx.rotate(ang);
@@ -208,7 +309,7 @@ R11 = (function () {
                     ctx.stroke();
                     break;
                 case "b":
-                    a1 - f * 0.25;
+                    a1 = f * 0.25;
                     x1 = f * 0;
                     x2 = f - a1;
                     x3 = f * 0.55;
@@ -370,10 +471,11 @@ R11 = (function () {
                     break;
                 case "k":
                     a1 = f * 0.4;
+                    a2 = 0.5;
                     x1 = 0;
                     x2 = f - a1;
                     y1 = -d;
-                    y2 = f * 0.6;
+                    y2 = f * a2;
                     y3 = f - d;
                     space -= a1;
                     ctx.moveTo(x1, y1);
@@ -420,12 +522,12 @@ R11 = (function () {
                     y1 = -d;
                     y2 = a2;
                     y3 = f - a2;
-                    y4 = f;
+                    y4 = y1 + f;
                     space -= a1;
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x1, y4);
                     ctx.moveTo(x1, y2);
-                    ctx.lineTo(x2, y3);
+                    ctx.lineTo(x2, y4);
                     ctx.moveTo(x2, y1);
                     ctx.lineTo(x2, y4);
                     ctx.stroke();
@@ -474,10 +576,11 @@ R11 = (function () {
                     x1 = f * 0;
                     x2 = f - a1;
                     x3 = f * 0.25;
-                    x4 = x2 + f * 0.1;
+                    x4 = x2 + f * 0.05;
                     y1 = f * 1 - lw / 2;
                     y2 = f * 0;
                     y3 = f * 0.4;
+                    y4 = y1 - f * 0.025;
                     space -= a1;
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x1, y2);
@@ -485,7 +588,7 @@ R11 = (function () {
                     ctx.lineTo(x2, y3);
                     ctx.lineTo(x1, y3);
                     ctx.moveTo(x3, y3);
-                    ctx.lineTo(x4, y1);
+                    ctx.lineTo(x4, y4);
                     ctx.stroke();
                     break;
                 case "q":
@@ -540,7 +643,7 @@ R11 = (function () {
                     x2 = f - a1;
                     x3 = x2 / 2;
                     y1 = 0;
-                    y2 = f * 1 - lw / 2;
+                    y2 = y1 + f - d;
                     space -= a1;
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y1);
@@ -574,7 +677,7 @@ R11 = (function () {
                     x3 = f - a1;
                     x2 = x3 / 2;
                     y1 = -d;
-                    y2 = f;
+                    y2 = f - d;
                     space -= a1;
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y2);
@@ -605,11 +708,11 @@ R11 = (function () {
                     break;
                 case "x":
                     a1 = f * 0.2;
-                    x1 = 0;
+                    x1 = 0 - d;
                     x2 = f - a1;
-                    y1 = 0;
-                    y2 = f;
-                    space -= a1;
+                    y1 = 0 - d;
+                    y2 = y1 + f;
+                    space -= a1 + d;
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y2);
                     ctx.moveTo(x1, y2);
@@ -639,6 +742,7 @@ R11 = (function () {
                     x2 = f - a1;
                     y1 = 0;
                     y2 = f * 1 - d;
+                    space -= a1;
                     ctx.moveTo(x1, y1);
                     ctx.lineTo(x2, y1);
                     ctx.moveTo(x2, y1);
@@ -667,11 +771,13 @@ R11 = (function () {
                     ctx.stroke();
                     break;
                 case "-":
-                    a1 = 0;
-                    a2 = f / 2;
-                    a3 = f - lw;
-                    ctx.moveTo(a1, a2);
-                    ctx.lineTo(a3, a2);
+                    a1 = f * 0.1;
+                    x1 = 0;
+                    x2 = f - a1;
+                    y1 = f / 2;
+                    space -= a1;
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y1);
                     ctx.closePath();
                     ctx.stroke();
                     break;
@@ -687,18 +793,20 @@ R11 = (function () {
                     ctx.stroke();
                     break;
                 case "1":
-                    x3 = f * 0.25;
-                    x1 = x3 + f * 0.02;
-                    x2 = x3 + f * 0.25;
-                    x4 = f - x3;
-                    y1 = f * 0;
+                    a1 = f * 0.25;
+                    a2 = f * 0.2;
+                    x1 = 0;
+                    x2 = f - a1 | 0;
+                    x3 = x2 / 2 | 0;
+                    x4 = x1;
+                    y1 = f * 1 - d;
                     y2 = f * 0;
-                    y3 = f * 1;
-                    space -= x3;
+                    y3 = f * 0;
+                    space -= a1;
                     ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.lineTo(x2, y3);
-                    ctx.lineTo(x3, y3);
+                    ctx.lineTo(x2, y1);
+                    ctx.moveTo(x3, y1);
+                    ctx.lineTo(x3, y2);
                     ctx.lineTo(x4, y3);
                     ctx.stroke();
                     break;
@@ -837,46 +945,51 @@ R11 = (function () {
                     break;
                 }
                 ctx.restore();
-                space += lw / 2;
-                x = (ornt === true) ? x + f + space: x;
-                y = (ornt === false) ? y + f + space: y;
+                space += d;
+                x = (horizontal === true) ? x + f + space: x;
+                y = (horizontal === false) ? y + f + space: y;
             }
             
         },
-        grid: (function () {
+        grid = (function () {
             var cv = createCanvas("grid", 3),
                 ctx = cv.getContext("2d");
             return {
-                update: function () {
-                    var f, e, t;
-                    bit = Math.pow(2, gz);
-                    ctx.clearRect(0, 0, w, h);
-                    ctx.fillStyle = (gz === zoom) ? "grey" : "black"; // grid color
-                    t = (gz === zoom) ? 0.4 : 0.8; // grid thickness
-                    for (f = 0; f <= w; f += bit) {
-                        ctx.fillRect(f, 0, t, h);
-                    }
-                    for (e = 0; e <= h; e += bit) {
-                        ctx.fillRect(0, e, w, t);
-                    }
-                    R11.settings.updateZoom();
-                    R11.settings.grid();
-                },
                 expand: function () {
-                    gz = (gz < max) ? gz + 1 : gz;
-                    R11.grid.update();
+                    bit = makeGrid(cv, gz = next1(gz, max));
                 },
                 reduce: function () {
-                    gz = (gz > zoom) ? gz - 1 : zoom;
-                    R11.grid.update();
+                    bit = makeGrid(cv, gz = back1(gz, zoom));
                 },
                 reset: function () {
-                    gz = zoom;
-                    R11.grid.update();
+                    bit = makeGrid(cv, gz = zoom);
                 }
             };
         }()),
-        realCanvas: (function () {
+        makeGrid = function (cv, level, x, y, w, h) {
+            var ctx, b, f, e, t;
+            cv = cv || document.createElement("canvas");
+            level = level || 1;
+            b = Math.pow(2, level);
+            ctx = cv.getContext("2d");
+            w = w || cv.width || 100;
+            h = h || cv.height || 100;
+            x = x || 0;
+            y = y || 0;
+            t = 0.7;
+            ctx.clearRect(x, y, w, h);
+            ctx.fillStyle = cv. color || "black";
+            for (f = x; f <= w; f += b) {
+                ctx.fillRect(f, y, t, h);
+            }
+            for (e = y; e <= h; e += b) {
+                ctx.fillRect(x, e, w, t);
+            }
+            settings.updateZoom();
+            settings.grid();
+            return b;
+        },
+        realCanvas = (function () {
             var image, data, rX, rY,
                 cv = createCanvas("realCanvas", 1, false),
                 ctx = cv.getContext("2d");
@@ -892,38 +1005,45 @@ R11 = (function () {
                 draw: function (x, y, rangeX, rangeY, color) {
                     ctx.fillStyle = color;
                     ctx.fillRect(x, y, rangeX, rangeY);
-                }
+                },
+                context: ctx,
             };
         }()),
-        canvas: (function () {
+        canvas = (function () {
             var gridX, gridY, startX, startY, range, curZoom, curPixel,
                 colorPixel, pickerPixel, xbit, ybit, tempX, tempY, rX, rY,
+                remainderW, remainderH,
                 cv = createCanvas("canvas", 2),
                 ctx = cv.getContext("2d"),
+                buf = createCanvas('buffer', 2, false),
+                bufCtx = buf.getContext('2d'),
                 canvasImage = ctx.getImageData(0, 0, cv.width, cv.height),
-                realC = ctx.getImageData(0,0,w,h).data,
+                realC = canvasImage.data,
                 rCanvas = document.getElementById("realCanvas");
             return {
                 update: function () {
                     zbit = Math.pow(2, zoom);
-                    xbit = Math.floor(w / zbit);
-                    ybit = Math.floor(h / zbit);
+                    xbit = (w / zbit) | 0;
+                    ybit = (h / zbit) | 0;
+                    remainderW = zbit / (w - xbit * zbit);
+                    remainderH = zbit / (h - ybit * zbit);
+                    
                 },
                 draw: function (x, y) {
                     var m, n,
                         fill = (flag["eraser"] === 0) ? fillStyle: "white";
                     curZoom = gz - zoom;
                     range = Math.pow(2, curZoom);
-                    gridX = Math.floor(x / bit);
-                    gridY = Math.floor(y / bit);
+                    gridX = (x / bit) | 0;
+                    gridY = (y / bit) | 0;
+
                     startX = gridX * bit;
                     startY = gridY * bit;
                     ctx.fillStyle = fill;
-              //      ctx.clearRect(startX, startY, bit, bit);
                     ctx.fillRect(startX, startY, bit, bit);
                     rX = curX + gridX * range;
                     rY = curY + gridY * range;
-                    R11.realCanvas.draw(rX, rY, range, range, fill)
+                    realCanvas.draw(rX, rY, range, range, fill)
                     for (m = 0; m <= range - 1; m += 1) {
                         for (n = 0; n <= range - 1; n += 1) {    
                             tempX = rX + m;
@@ -935,58 +1055,60 @@ R11 = (function () {
                             }
                         }
                     }
-                    
-                    R11.miniDisplay.updateImage(rCanvas);
+                    miniDisplay.updateImage(rCanvas);
                 },
                 shift: function (x, y) {
                     
                     flag["displayover"] = 1;
                     flag["draw"] = 0;
-                    R11.canvas.update();
+                    canvas.update();
                     if (window.wiiu) {
-                        x += Math.floor(state.rStickX * 5);
-                        y -= Math.floor(state.rStickY * 5);
+                        x += (state.rStickX * 5) | 0;
+                        y -= (state.rStickY * 5) | 0;
                     }
-                    x = (x <= 0) ? 0 : x;
-                    y = (y <= 0) ? 0 : y;
-                    x = (x >= w - xbit) ? w - xbit : x;
-                    y = (y >= h - ybit) ? h - ybit : y;
+
+                    x = (x <= 0) ? 0:
+                        (x >= w - xbit) ? w - xbit:
+                        x;
+                    y = (y <= 0) ? 0:
+                        (y >= h - ybit) ? h - ybit:
+                        y;
                     
                     if (flag["mousedown"] === 1) {
-                        ctx.drawImage(rCanvas, x, y, w/zbit, h/zbit, 0, 0, w, h);
-                        R11.settings.updateXY(x, y, "red");
+                        ctx.drawImage(rCanvas, x, y, xbit, ybit, 0, 0, w, h);
+                        settings.updateXY(x, y, "red");
                         flag["loading"] = 1;
                     } else {
                         drawReal(ctx, realC, x, y, xbit, ybit);
-                        R11.settings.updateXY(x, y, "white");
+                        settings.updateXY(x, y, "white");
                     }
                 },
                 postzoom: function (d) {
                  //   curX += Math.round((curX + 1) * 0.25);
                    // curY += Math.round((curY + 1) * 0.25);
-                 //   R11.canvas.update();
+                 //   canvas.update();
                     curX = (zoom === 0) ? 0: curX;
                     curY = (zoom === 0) ? 0: curY;
-                    R11.canvas.update();
+                    canvas.update();
                     flag["mousedown"] = 0;
-                    R11.canvas.shift(Math.round(curX - xbit / 4 * d), Math.round(curY - ybit / 4 * d));
-                    R11.grid.reset();
+                    canvas.shift((curX - xbit / 4 * d) | 0, (curY - ybit / 4 * d) | 0);
+                    grid.reset();
                     flag["draw"] = 1
                     
                 },
                 zoomin: function () {
-                    zoom = (zoom < max) ? zoom + 1 : max;
-                    R11.grid.reset();
-                    R11.canvas.postzoom(-1);
+                    zoom = next1(zoom, max);
+                    grid.reset();
+                    canvas.postzoom(-1);
                 },
                 zoomout: function () {
-                    zoom = (zoom > 1) ? zoom - 1 : 0;
-                    R11.grid.reset();
-                    R11.canvas.postzoom(1);
+                    zoom = back1(zoom, 0);
+                    grid.reset();
+                    canvas.postzoom(1);
                 }
             };
         }()),
-        ball: (function () {
+        ball = (function () {
             var ballRadius = 5,
                 ball = {
                     radius: ballRadius,
@@ -1044,7 +1166,7 @@ R11 = (function () {
                  //   ballGo = 0;
                 },
                 update: function () {
-                    R11.ball.checkCollision();
+                    ball.checkCollision();
                     ctx.clearRect(oldBallX - ball.radius - 50, oldBallY - ball.radius - 50, (ball.radius + 10) * 2 * 50, (ball.radius + 10) * 2 * 50);
                     // ball
                     ctx.beginPath();
@@ -1067,7 +1189,7 @@ R11 = (function () {
                 }
             }
         }()),
-        settings: (function () {
+        settings = (function () {
             var cv = createCanvas("settings", 4),
             ctx = cv.getContext("2d"),
             colorR = 100,
@@ -1087,14 +1209,14 @@ R11 = (function () {
                     ctx.strokeStyle = "black";
                     ctx.strokeStyle = "10px";
                     ctx.strokeRect(0, h5, sw, h2 - h5);
-                    R11.text("grid", ctx, 13, 145, "black", 8, 0.5, 5, 1.5, false);
-                    R11.text("+", ctx, 15, 110, "black", 12, 0.5, 1, 1.5, false);
-                    R11.text("-", ctx, 15, 210, "black", 12, 0.5, 1, 1.5, false);
+                    customFont("grid", ctx, 13, 145, "black", 8, 5, 1.5, false);
+                    customFont("+", ctx, 15, 110, "black", 12, 1, 1.5, false);
+                    customFont("-", ctx, 15, 210, "black", 12, 1, 1.5, false);
                     ctx.fillStyle = "white";
                     ctx.fillRect(0, h2, sw, h3);
                     ctx.strokeRect(0, h2, sw, h3);
-                    R11.text(""+currentGrid+"", ctx, w2, h4, "black", 8, 0, 2, 1.5, true);
-                    R11.text("x", ctx, w3, h4 + 3, "black", 6, 0, 2, 1.5, true);
+                    customFont(""+currentGrid+"", ctx, w2, h4, "black", 8, 2, 1.5, true);
+                    customFont("x", ctx, w3, h4 + 3, "black", 6, 2, 1.5, true);
                 },
                 update: function () {
                     ctx.fillStyle = "white";
@@ -1102,18 +1224,18 @@ R11 = (function () {
                     ctx.strokeStyle = "black";
                     ctx.strokeStyle = "10px";
                     ctx.strokeRect(w - sw, h - 137, sw, h / 3);
-                    R11.text("zoom", ctx, w - 7, h - 102, "black", 8, 0.5, 5, 1.5, false);
-                    R11.text("+", ctx, w - 4, h - 124, "black", 12, 0.5, 1, 1.5, false);
-                    R11.text("-", ctx, w - 4, h - 45, "black", 12, 0.5, 1, 1.5, false);
-      //            R11.text("<-", ctx, 3, 310, "black", 6, 0, 1, 1.5, true);
+                    customFont("zoom", ctx, w - 7, h - 102, "black", 8, 5, 1.5, false);
+                    customFont("+", ctx, w - 4, h - 124, "black", 12, 1, 1.5, false);
+                    customFont("-", ctx, w - 4, h - 45, "black", 12, 1, 1.5, false);
+      //            customFont("<-", ctx, 3, 310, "black", 6, 0, 1, 1.5, true);
                 },
                 updateXY: function (x, y, color){
                     ctx.fillStyle = (color) ? color: "green";
                     ctx.fillRect(w - sw, 0, sw, 180);
                     ctx.strokeRect(w - sw, 0, sw, 180);
-                    R11.text("x:"+x, ctx, w - 6, 10, "black", 8, 0.5, 5, 1.5, false);
-                    R11.text("y:"+y, ctx, w - 6, 100, "black", 8, 0.5, 5, 1.5, false);
-                    R11.miniDisplay.miniBox(x, y);
+                    customFont("x:"+x, ctx, w - 6, 10, "black", 8, 5, 1.5, false);
+                    customFont("y:"+y, ctx, w - 6, 100, "black", 8, 5, 1.5, false);
+                    miniDisplay.miniBox(x, y);
                     curX = x;
                     curY = y;
                 },
@@ -1121,16 +1243,16 @@ R11 = (function () {
                     ctx.clearRect(0, 0, menuWidth, h);
                     ctx.fillStyle = "black";
                     ctx.fillRect(0, 0, 110, 30);
-                    R11.text("eraser", ctx, 6   , 10, "white", 14, 0, 5, 2, true);
+                    customFont("eraser", ctx, 6   , 10, "white", 14, 5, 2, true);
                     ctx.fillStyle = "white";
                     ctx.fillRect(0, 30, 65, 20);
                     ctx.strokeStyle = "black";
                     ctx.strokeRect(0, 30, 65, 20);
-                    R11.text("match", ctx, 6, 37, "black", 8, 0, 3, 1.5, true);
+                    customFont("match", ctx, 6, 37, "black", 8, 3, 1.5, true);
                     ctx.fillStyle = "white";
                     ctx.fillRect(0, 50, 55, 20);
                     ctx.strokeRect(0, 50, 55, 20);
-                    R11.text("save", ctx, 6, 57, "black", 8, 0, 3, 1.5, true);
+                    customFont("save", ctx, 6, 57, "black", 8, 3, 1.5, true);
                 },
                 menuSelect: 0,
                 menu: function () {
@@ -1147,7 +1269,7 @@ R11 = (function () {
                     ctx.clearRect(0, 0, menuW, h);
                     for (i = 0; i < numOptions; i += 1) {
                         w2 = options[i].length;
-                        R11.text(options[i], ctx, 6, 57, "black", 8, 0, 3, 1.5, true);
+                        customFont(options[i], ctx, 6, 57, "black", 8, 3, 1.5, true);
                     }
                 },
                 updateZoom: function () {
@@ -1156,18 +1278,18 @@ R11 = (function () {
                     ctx.fillRect(w - sw, h - h2, sw, h2);
                     ctx.strokeStyle = "black";
                     ctx.strokeRect(w - sw, h - h2, sw, h2);
-                    R11.text(""+(zoom + 1)+"", ctx, w - 19, h - h2 / 1.5, "black", 8, 0, 2, 1.5, true);
-                    R11.text("x", ctx, w - 10, h - 14, "black", 6, 0, 2, 1.5, true);
+                    customFont(""+(zoom + 1)+"", ctx, w - 19, h - h2 / 1.5, "black", 8, 2, 1.5, true);
+                    customFont("x", ctx, w - 10, h - 14, "black", 6, 2, 1.5, true);
                 },
                 updateAll: function () {
-                    R11.settings.update();
-                    R11.settings.grid();
-                    R11.settings.updateXY(curX, curY, "white");
-                    R11.settings.updateZoom();
+                    settings.update();
+                    settings.grid();
+                    settings.updateXY(curX, curY, "white");
+                    settings.updateZoom();
                 }
             }
         }()),
-        colorCharts: (function () {
+        colorCharts = (function () {
             var cv = createCanvas("chart", 9),
                 ctx = cv.getContext('2d'),
                 palettes = [
@@ -1182,173 +1304,197 @@ R11 = (function () {
                 imageLen = palettes.length - 1,
                 chooseImage = 0,
                 palette = new Image(),
-                strokeW = 5,
-                boxX = 0,
-                boxY = 50,
-                boxW = Math.round(w / 3),
-                boxH = Math.round(h / 2),
-                chartW = boxW - strokeW,
-                chartX = boxX + strokeW/2,
-                chartH = boxH - strokeW,
-                chartY = boxY + strokeW/2,
-                closeX = chartX + chartW + 3,
-                closeY = chartY + 3,
-                arrowX = chartX,
-                arrowW = 160,
-                arrowH = 50,
-                arrowY = boxY + boxH - arrowH,
+                strokeW = 3,
+                box = {
+                    x: 0,
+                    y: 50,
+                    w: w / 3 | 0,
+                    h: h / 2.3 | 0,
+                },
+                chart = {
+                    x: box.x + strokeW / 2,
+                    y: box.y + strokeW / 2,
+                    w: box.w - strokeW,
+                    h: box.h - strokeW,
+                    func: function () {
+                            flag["chartover"] = 1;
+                            flag["draw"] = 0;
+                    }
+                },
+                close = {
+                    x: chart.x + chart.w + 3,
+                    y: chart.y + 3,
+                    w: closeW,
+                    h: closeH
+                },
+                open = {
+                    x: 0,
+                    y: close.y,
+                    w: close.w,
+                    h: close.h
+                },
+                prev = {
+                    x: chart.x,
+                    w: 85,
+                    h: 25,
+                    y: box.y + box.h - 25,
+                    text: "back"
+                },
+                next = {
+                    x: prev.x + prev.w + strokeW,
+                    y: prev.y,
+                    w: prev.w - strokeW,
+                    h: prev.h,
+                    text: "next"
+                },
+                name = {
+                    x: next.x + prev.w,
+                    y: next.y,
+                    w: box.w - prev.w * 2 - strokeW * 2, 
+                    h: prev.h,
+                    text: "default",
+                    background: "yellow",
+                    color: "red"
+                },
+                text = {
+                    "prev": {
+                        x: prev.x + 15,
+                        y: prev.y + prev.w - 30
+                    },
+                    "next": {
+                        
+                    }
+                },
+                prevTextX = 5,
+                prevTextY = 5,
                 curFaves = [],
-                curChoice = curColor,
-                colorPixel = getImage("chart").data;
+                colorPixel = getImage("chart").data,
+                func = {
+                    next: function () {
+                        chooseImage = next1(chooseImage, imageLen);  
+                        func.updateChart(chooseImage);
+                    },
+                    prev: function () {
+                        chooseImage = back1(chooseImage, 0);
+                        func.updateChart(chooseImage);
+                    },
+                    curColor: function () {
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(0, 0, 50, 50);
+                        ctx.fillStyle = fillStyle;
+                        ctx.fillRect(4, 4, 42, 42);
+                        ctx.beginPath();
+                        ctx.strokeStyle = "black";
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(0, 0, 50, 50);
+                        ctx.closePath();
+                        ctx.stroke();
+                    },
+                    updateChart: function (x) {
+                        var ph, pw;
+                        x = x || 0;
+                        palette.src = (palettes[x][0]) ? palettes[x][0]: palettes[0][0];
+                        palette.name = (palettes[x][1]) ? palettes[x][1]: "error";
+                        ph = palette.height;
+                        pw = palette.width;
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(chart.x, chart.y, chart.w, chart.h - prev.h);
+                        ctx.drawImage(palette, 0, 0, pw, ph, chart.x, chart.y, chart.w, ph*2);
+                        colorPixel = getImage("chart").data;
+                        name.text = palette.name;
+                        func.button(name);
+                    },
+                    open: function () {
+                        ctx.open = 1;
+                        ctx.fillStyle = "white";
+                        ctx.fillRect(box.x, box.y, box.w, box.h);
+                        ctx.strokeStyle = "black";
+                        ctx.lineWidth = strokeW;
+                        ctx.strokeRect(box.x, box.y, box.w, box.h);
+                        ctx.stroke();
+                        xBox(ctx, close.x, close.y);
+                        func.updateChart(chooseImage);
+                        func.button(prev);
+                        func.button(next);
+                        func.button(name);
+                    },
+                    close: function () {
+                        ctx.open = 0;
+                        ctx.clearRect(0,0,w,h);
+                        xBox(ctx, 0, close.y);
+                        func.curColor();
+                    },
+                    button: function (b) {
+                        ctx.fillStyle = b.background || "white";
+                        ctx.fillRect(b.x, b.y, b.w, b.h);
+                        ctx.strokeStyle = "black";                       
+                        ctx.beginPath();
+                        ctx.lineWidth = strokeW;
+                        ctx.strokeRect(b.x, b.y, b.w, b.h);
+                        ctx.closePath();
+                        ctx.stroke();
+                        customFont(""+b.text+"", ctx, prevTextX + b.x, b.y + prevTextY, b.color || "black", 15, 8, 2.5, true);
+                    }
+                };
             ctx.open = 0;
             for (var i = imageLen; i >= 0; i -= 1) {
                 palette.src = palettes[chooseImage][0];
             }
             return {
-                nextChart: function () {
-                    chooseImage =
-                        (chooseImage < imageLen) ? (chooseImage + 1):
-                        (chooseImage < 0) ? 0:
-                        imageLen;
-                        
-                    R11.colorCharts.showChart();
-                },
-                prevChart: function () {
-                    chooseImage =
-                        (chooseImage > 0) ? chooseImage - 1:
-                        (chooseImage > imageLen) ? imageLen - 1:
-                        0;
-                        
-                    chooseImage = (chooseImage < 0) ? 0: chooseImage;
-                    R11.colorCharts.showChart();
-                },
+                nextChart: func.next,
+                prevChart: func.prev,
+                curColor: func.curColor,
+                updateChart: func.updateChart,
+                updateName: func.updateName,
+                buttons: func.buttons,
+                open: func.open,
+                close: func.close,
                 check: function(x, y) {
                     var curPixel = getPixel(x, y);
                     if (flag["mousedown"] === 1) {
                         if (ctx.open === 1) {
-                            if (x >= closeX && x <= closeX + closeW && y >= closeY && y <= closeY + closeH) {
+                            if (contains(box, x, y)) {
+                                flag["chartover"] = 1;
+                                flag["draw"] = 0;
+                            }
+                            if (contains(close, x, y)) {
                                 flag["mousedown"] = 0;
-                                R11.colorCharts.close();
+                                func.close();
                                 return;
-                            } else if (y >= arrowY && y <= arrowY + arrowH) {
-                                flag["chartover"] = 1;
-                                flag["draw"] = 0;
-                                if (x >= arrowX && x <= (arrowX + boxW) / 2) {
-                                    R11.colorCharts.prevChart();
-                                } else {
-                                    R11.colorCharts.nextChart();
-                                }
+                            } else if (contains(prev, x, y)) {
+                                func.prev();
+                            } else if (contains(next, x, y)){
+                                func.next();
+                            
                             } else if (colorPixel[curPixel + 3] !== 0) {
-                                flag["chartover"] = 1;
-                                flag["draw"] = 0;
-                                    curColor.splice(0, 4, colorPixel[curPixel], colorPixel[curPixel + 1], colorPixel[curPixel + 2], colorPixel[curPixel + 3])
-                                    updateFill();
-                                    R11.colorCharts.curColor();
+                                curColor.splice(0, 4, colorPixel[curPixel], colorPixel[curPixel + 1], colorPixel[curPixel + 2], colorPixel[curPixel + 3])
+                                updateFill();
+                                func.curColor();
                                 return;
                             }
-                        } else if (x >= 0 && x <= closeW && y >= closeY && y <= closeY + closeH) {
-                            R11.colorCharts.open();
-                        
-                            flag["draw"] = 0;
-                            flag["mousedown"] = 0;
-                            flag["chartover"] = 0;
+                        } else if (contains(open, x, y)) {
+                            func.open();
                         }
                     }
                     flag["draw"] = 1;
                     flag["chartover"] = 0;
-                },
-                curColor: function () {
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(0, 0, 50, 50);
-                    ctx.fillStyle = fillStyle;
-                    ctx.fillRect(4, 4, 42, 42);
-                    ctx.beginPath();
-                    ctx.strokeStyle = "black";
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(0, 0, 50, 50);
-                    ctx.closePath();
-                    ctx.stroke();
-                },
-                showChart: function () {
-                    var ph, pw;
-                    palette.src = (palettes[chooseImage][0]) ? palettes[chooseImage][0]: palettes[0][0];
-                    palette.name = (palettes[chooseImage][1]) ? palettes[chooseImage][1]: "error";
-                    ph = palette.height;
-                    pw = palette.width;
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(chartX, chartY, chartW, chartH - arrowH);
-                    ctx.drawImage(palette, 0, 0, pw, ph, chartX, chartY, chartW, ph*2);
-                    colorPixel = getImage("chart").data;
-                    
-                    R11.colorCharts.updateName(palette.name);
-                },
-                updateName: function (name){
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(arrowX + arrowW + strokeW, arrowY, boxW - arrowW * 2 - strokeW * 3, arrowH - strokeW);
-                    ctx.font = "25px sans-serif";
-                    ctx.fillStyle = "black";
-                    ctx.beginPath();
-                    ctx.fillText(""+ name +"", arrowX + arrowW + strokeW + 30, arrowY + arrowH - arrowH/3);
-                    ctx.closePath();
-                    ctx.fill();  
-                },
-                arrows: function () {
-
-                    ctx.strokeStyle = "black";
-                    ctx.font = "25px sans-serif";
-                    ctx.fillStyle = "black";
-                    
-                    ctx.beginPath();
-                    ctx.lineWidth = strokeW;
-                    ctx.strokeRect(arrowX, arrowY, arrowW, arrowH);
-                    ctx.closePath();
-                    ctx.stroke();
-                    ctx.fillText("prev", arrowX + 5, arrowY + arrowH - arrowH/3);
-                    ctx.fill();
-                    
-                    ctx.beginPath();
-                    ctx.lineWidth = strokeW;
-                    ctx.strokeRect(arrowX + boxW - arrowW, arrowY, arrowW - strokeW, arrowH);
-                    ctx.closePath();
-                    ctx.stroke();
-                    ctx.fillText("next", arrowX + boxW - arrowW + 5, arrowY + arrowH - arrowH/3);
-                    ctx.fill();                    
-                },
-                open: function () {
-                    ctx.open = 1;
-                    ctx.fillStyle = "white";
-                    ctx.fillRect(boxX, boxY, boxW, boxH);
-                    ctx.strokeStyle = "black";
-                    ctx.lineWidth = strokeW;
-                    ctx.strokeRect(boxX, boxY, boxW, boxH);
-                    ctx.stroke();
-                    xBox(ctx, closeX, closeY);
-                    R11.colorCharts.arrows();
-                    R11.colorCharts.showChart();
-
-                },
-                close: function () {
-                    ctx.open = 0;
-                    ctx.clearRect(0,0,w,h);
-                    xBox(ctx, 0, closeY);
-                    R11.colorCharts.curColor();
                 }
             }
         }()),
-        miniDisplay: (function () {
+        miniDisplay = (function () {
             var cv = createCanvas("miniDisplay", 11),
                 ctx = cv.getContext("2d"),
                 minicv = createCanvas("miniBox", 12),
                 minictx = minicv.getContext('2d'),
                 ratio = 4,
-                displayW = Math.round(w / ratio),
-                displayH = Math.round(h / ratio),
+                displayW = (w / ratio) | 0,
+                displayH = (h / ratio) | 0,
                 displayX = 0,
                 displayY = h - displayH,
-                miniX = displayX + Math.round(curX / ratio),
-                miniY = displayY + Math.round(curY / ratio),
-                miniW = Math.round(displayW / zbit),
-                miniH = Math.round(displayH / zbit),
+                miniX = displayX + (curX / ratio) | 0,
+                miniY = displayY + (curY / ratio) | 0,
+                miniW = (displayW / zbit) | 0,
+                miniH = (displayH / zbit) | 0,
                 buffer = 20,
                 closeX = displayX + displayW + 1,
                 closeY = displayY + displayH - closeH,
@@ -1360,10 +1506,10 @@ R11 = (function () {
             return {
                 miniBox: function (x, y) {
                     if (x && y) {
-                        miniX = displayX + Math.round(x / ratio);
-                        miniY = displayY + Math.round(y / ratio);
-                        miniW = displayW / zbit;
-                        miniH = displayH / zbit;
+                        miniX = displayX + (x / ratio) | 0;
+                        miniY = displayY + (y / ratio) | 0;
+                        miniW = displayW / zbit | 0;
+                        miniH = displayH / zbit | 0;
                     }
                     minictx.clearRect(displayX, displayY, displayW, displayH);
                     minictx.lineWidth = 1;
@@ -1391,9 +1537,9 @@ R11 = (function () {
                     flag["mousedown"] = 0;
                     flag["draw"] = 0;
                     ctx.open = 1;
-                    R11.miniDisplay.bigBox(displayX, displayY);
-                    R11.miniDisplay.miniBox(curX, curY);
-                    R11.miniDisplay.updateImage();
+                    miniDisplay.bigBox(displayX, displayY);
+                    miniDisplay.miniBox(curX, curY);
+                    miniDisplay.updateImage();
                     xBox(ctx, closeX, closeY);
                 },
                 close: function () {
@@ -1411,26 +1557,26 @@ R11 = (function () {
                         if (x <= displayX + displayW + buffer && y <= displayY + displayH + buffer) {
                             if (x >= displayX - buffer && y >= displayY - buffer && flag["mousedown"] === 1) {
                                 if (x >= closeX && y >= closeY && x <= totalW && y <= totalH) {
-                                    R11.miniDisplay.close();
+                                    miniDisplay.close();
                                     return;
                                 }
 
-                                x = Math.round((x - miniW / 2) * ratio - displayX * ratio);
-                                y = Math.round((y - miniH / 2) * ratio - displayY * ratio);
-                                R11.canvas.shift(x, y);
+                                x = ((x - miniW / 2) * ratio - displayX * ratio) | 0;
+                                y = ((y - miniH / 2) * ratio - displayY * ratio) | 0;
+                                canvas.shift(x, y);
                                 return;
                             }
                         }
                     } else if (x <= closeW && y >= closeY && y <= totalH && flag["mousedown"] === 1) {
  
-                        R11.miniDisplay.open();
+                        miniDisplay.open();
                       
                     }
                     flag["displayover"] = 0;
                 }
             }
         }()),
-        touchCheck: function (e) {
+        touchCheck = function (e) {
             var x, y;
             
             if (e) {
@@ -1448,17 +1594,18 @@ R11 = (function () {
                 }
             }
             if (flag["drawing"] === 0 && flag["mousedown"] === 1) {
-                R11.colorCharts.check(x, y);
-                R11.miniDisplay.check(x, y);
+                colorCharts.check(x, y);
+                miniDisplay.check(x, y);
             }
             if (flag["mousedown"] === 1 && flag["chartover"] === 0 && flag["displayover"] === 0 && flag["draw"] === 1) {
                 flag["drawing"] = 1;
-                R11.canvas.draw(x, y);
+                canvas.draw(x, y);
             }
             
         },
-        
-        buttons: function (e) {
+
+        buttons = function (controls, e) {
+            var event, zoomD, newZoom;
             if (window.wiiu) {
                 state = window.wiiu.gamepad.update();
                 if (!state.isEnabled || !state.isDataValid) {
@@ -1466,224 +1613,166 @@ R11 = (function () {
                 }
                 if (state.tpValidity === 0) {
                     if (state.tpTouch === 1) {
-                        R11.canvas.draw();
+                        var x = e.pageX,
+                            y = e.pageY;
+                        canvas.draw(x, y);
                     }
                 }
                 if (state.rStickX !== 0 || state.rStickY !== 0) {
-                    R11.canvas.shift(); //  I need to ensure the canvasX and canvasY shift in the fillCanvas(?) function
+                    canvas.shift(curX, curY); //  I need to ensure the canvasX and canvasY shift in the fillCanvas(?) function
                 }
                 if (state.lStickX !== 0 || state.lStickY !== 0) {
-                    R11.picker.update();
+                    picker.update();
                 }
-                switch (state.hold & 0x7f86fffc) { // wiiu buttons
-                case 0x00002000:  // 
-                    toggle("settings");
-                    break;
-                case 0x00008000:  // A button
-                    toggle("ball", 1);
-                    toggle("settings", 0);
-                    toggle("grid", 0);
-                    cImage = getImage("canvas");
-                    ballGo = 1;
-                    break;
-                case 0x00000008: // + sign
-                    // reminder:  add the ability to hold the rStick in order to zoom downward rather than always top-left
-                    R11.canvas.zoomin();
-                    break;
-                case 0x00000004: // - sign
-                    R11.canvas.zoomout();
-                    break;
-                case 0x00000800:  // left
-                    R11.settings.subMenu();
-         
-                    break;
-                case 0x00000400:  // right
-                    R11.picker.update();
-                    R11.settings.grid();
-                    break;
-                case 0x00000200:  // up
-                    R11.grid.expand();
-                    break;
-                case 0x00000100:  // down
-                    R11.grid.reduce();
-                    break;
-                case 0x00040000:  // lstick
-                    toggle("grid", 1);
-                    break;
-                case 0x00020000:
-                    toggle("grid", 0);
-                    break;
-                case 0x00000010:  // R shoulder
-                    toggle("ball", 0);
-                    toggle("settings", 1);
-                    toggle("grid", 1);
-                    ballGo = 0;
-                    break;
-                default:
-                    break;   //change this to "return" when I isolate the switch
+            } else { state = new DummyData;}
+            event = e.keyCode || event.keyCode || controls.event || null;
+            switch (event) {
+            case 37: // left
+                curX -= shift;
+                canvas.shift(curX, curY);
+                break;
+            case 39: // right
+                curX += shift;
+                canvas.shift(curX, curY);
+                break;
+            case 38:  // up
+                curY -= shift;
+                canvas.shift(curX, curY);
+                break;
+            case 40: // down
+                curY += shift;
+                canvas.shift(curX, curY);
+                break;
+            case controls.grid.expand:
+                grid.expand();
+                break;
+            case controls.grid.reduce:
+                grid.reduce();
+                break;
+            case controls.ballon:
+                toggle("ball")
+                ball.update();
+                ballGo = 1;
+                break;
+            case 13: // return/enter
+                break;
+            case controls.zoomout:
+                canvas.zoomout();
+                break;
+            case controls.zoomin:
+                canvas.zoomin();
+                break;
+            case controls.grid.toggle:
+                toggle("grid");
+                break;
+            case 85: // u
+                toggle("miniDisplay", 0);
+                toggle("miniBox", 0);
+                flag["displayopen"] = 0;
+                flag["displayover"] = 0;
+                break;
+            case 73: // i
+                toggle("miniDisplay", 1);
+                toggle("miniBox", 1);
+                flag["displayopen"] = 1;
+                flag["displayover"] = 1;
+                break;
+            case 79: // o
+                toggle("realCanvas", 0);
+                toggle("canvas", 1);
+                break;
+            case 80: // p
+                toggle("realCanvas", 1);
+                toggle("canvas", 0);
+                break;
+            case controls.eraseron:
+                flag["eraser"] = 1;
+       //         settings.subMenu();
+                break;
+            case controls.eraseroff:
+                flag["eraser"] = 0;
+                break;
+            case controls.save:
+                zoom = 1;
+                canvas.zoomout();
+              //  toggle("grid", 0);
+                exportImage("canvas");
+                break;
+            case 84:
+                break;
+            case 219: // [ open bracket
+                if (flag["chartopen"] === 1) {
+                    colorCharts.prevChart();
                 }
-                if (ballGo === 1) {
-                    R11.ball.update();
+                break;
+            case 221: // ] close bracket
+                flag["chartopen"] = 1;
+                colorCharts.nextChart();
+                break;
+            case 220: // \ back slash
+                if (flag["chartopen"] === 1) {
+                    flag["chartopen"] = 0;
+                    flag["chartover"] = 0;
+                    
                 }
-            } else {  // computer controls
-                var event, zoomD, newZoom;
-                if (e !== undefined) {
-                    e = e || event;
-                    if (e.pageX) {
-                        R11.canvas.draw();
-                    }
-                    if (e.keyCode <= 57 && e.keyCode >= 49) {
-                  //      newZoom = e.keyCode - 49;
-                //        if (zoom !== e.keyCode - 49) {
-              //              zoomD = (zoom < newZoom) ? -1: 1;
-            //                zoom = newZoom;
-          //                  R11.canvas.postzoom(zoomD);
-          //              }
-        //                return;
-                    }
-                    switch (e.keyCode) {
-                    case 37: // left
-                        curX -= shift;
-                        R11.canvas.shift(curX, curY);
-                        break;
-                    case 39: // right
-                        curX += shift;
-                        R11.canvas.shift(curX, curY);
-                        break;
-                    case 38:  // up
-                        curY -= shift;
-                        R11.canvas.shift(curX, curY);
-                        break;
-                    case 40: // down
-                        curY += shift;
-                        R11.canvas.shift(curX, curY);
-                        break;
-                    case 190:  // period
-                        R11.grid.expand();
-                        break;
-                    case 188:  // comma
-                        R11.grid.reduce();
-                        break;
-                    case 66: // b
-                        toggle("ball")
-                        R11.ball.update();
-                        ballGo = 1;
-                        break;
-                    case 13: // return/enter
-                        break;
-                    case 75: // k
-                        R11.canvas.zoomout();
-                        break;
-                    case 76: // lÊ
-                        R11.canvas.zoomin();
-                        break;
-                    case 71: // g
-                        toggle("grid");
-                        break;
-                    case 85: // u
-                        toggle("miniDisplay", 0);
-                        toggle("miniBox", 0);
-                        flag["displayopen"] = 0;
-                        flag["displayover"] = 0;
-                        break;
-                    case 73: // i
-                        toggle("miniDisplay", 1);
-                        toggle("miniBox", 1);
-                        flag["displayopen"] = 1;
-                        flag["displayover"] = 1;
-                        break;
-                    case 79: // o
-                        toggle("realCanvas", 0);
-                        toggle("canvas", 1);
-                        break;
-                    case 80: // p
-                        toggle("realCanvas", 1);
-                        toggle("canvas", 0);
-                        break;
-                    case 81: // q
-                        flag["eraser"] = 1;
-               //         R11.settings.subMenu();
-                        break;
-                    case 87: // w
-                        flag["eraser"] = 0;
-                        break;
-                    case 83: // save
-                        zoom = 1;
-                        R11.canvas.zoomout();
-                      //  toggle("grid", 0);
-                        exportImage("canvas");
-                        break;
-                    case 84:
-                        break;
-                    case 219: // [ open bracket
-                        if (flag["chartopen"] === 1) {
-                            R11.colorCharts.prevChart();
-                        }
-                        break;
-                    case 221: // ] close bracket
-                        flag["chartopen"] = 1;
-                        R11.colorCharts.nextChart();
-                        break;
-                    case 220: // \ back slash
-                        if (flag["chartopen"] === 1) {
-                            flag["chartopen"] = 0;
-                            flag["chartover"] = 0;
-                            
-                        }
-                        break;
-                    default:
-                        return true;
-                    }
-                }
+                break;
+            default:
+                return true;
             }
-        },
-        init: function () {
-            R11.grid.update();
-            R11.canvas.update();
-            R11.settings.updateAll();
-            R11.colorCharts.close();
-            R11.miniDisplay.open();
-            if (window.wiiu) {
-                window.onmousemove = function (e) {
-                    flag["mousemove"] = 1;
-                    R11.touchCheck(e);
-                }
-                window.setInterval(R11.buttons, 20);
-            } else {
-                state = new DummyData();
-                R11.ball.setBall(200, 200);
-                window.onkeydown = function (e) {
-                    flag["keydown"] = 1;
-                    R11.buttons(e);
-                }
-                window.onkeyup = function (e) {
-                    flag["keydown"] = 0;   
-                }
-                window.onkeypress = function (e) {
-                    flag['keypress'] = 1
-                }
-                window.onmousemove = function (e) {
-                    flag["mousemove"] = 1;
-                    R11.touchCheck(e);
-                }
-                window.onmousedown = function (e) {
-                    flag["mousedown"] = 1;
-                    R11.touchCheck(e);
-                }
-                window.onmouseup = function (e) {
-                    flag["mousedown"] = 0;
-                    flag["drawing"] = 0;
-                    if (flag["loading"] === 1) {
-                        R11.canvas.shift(curX, curY);
-                        flag["loading"] = 0;
-                        flag["draw"] = 1
-                    }
-                }
+            if (ballGo === 1) {
+                ball.update();
+            }
+        };
+        return {
+            init: function () {
+                var controls = {};
+                controls = new Controls();
+                grid.reset();
+                canvas.update();
+                settings.updateAll();
+                colorCharts.close();
+                miniDisplay.open();
                 
-                flag["draw"] = 1;
-
+                if (window.wiiu) {
+                    window.onmousemove = function (e) {
+                        flag["mousemove"] = 1;
+                        flag["mousedown"] = 1;
+                        touchCheck(e);
+                    }
+                    window.setInterval(buttons(controls), 20);
+                } else {
+                    ball.setBall(200, 200);
+                    window.onkeydown = function (e) {
+                        flag["keydown"] = 1;
+                        buttons(controls, e);
+                    }
+                    window.onkeyup = function (e) {
+                        flag["keydown"] = 0;   
+                    }
+                    window.onkeypress = function (e) {
+                        flag['keypress'] = 1
+                    }
+                    window.onmousemove = function (e) {
+                        flag["mousemove"] = 1;
+                        touchCheck(e);
+                    }
+                    window.onmousedown = function (e) {
+                        flag["mousedown"] = 1;
+                        touchCheck(e);
+                    }
+                    window.onmouseup = function (e) {
+                        flag["mousedown"] = 0;
+                        flag["drawing"] = 0;
+                        if (flag["loading"] === 1) {
+                            canvas.shift(curX, curY);
+                            flag["loading"] = 0;
+                            flag["draw"] = 1
+                        }
+                    }
+                    
+                    flag["draw"] = 1;
             }
         }
     };
 }());
-window.onload = R11.init;
+window.onload = AR.R11.init;
