@@ -47,15 +47,19 @@ test('mousedown in drawable region fires fillRect on both canvases', () => {
         'expected fillRect on the realCanvas pixel buffer (got ' + realFills.length + ')');
 });
 
-test('mousedown writes the current color into the pixel buffer', () => {
+test('mousedown writes the current color into the master pixel buffer', () => {
     const { window, canvasCtx } = bootDraw();
 
     window.onmousedown({ pageX: 500, pageY: 400 });
 
-    // setPixels writes into `realC`, which is the main canvas's getImageData().data.
-    // (Yes, the variable is misnamed in draw.js — it points at the main canvas,
-    // not at realCanvas. See the canvas IIFE: realC = canvasImage.data.)
-    assert.ok(canvasCtx.__imageData, 'main canvas should have image data');
+    // Architecture: a stroke lands in three places on purpose.
+    //   1. preview canvas: fillRect at the zoomed grid cell (immediate feedback)
+    //   2. realCanvas:     fillRect at final-resolution (source for mini-display)
+    //   3. realC buffer:   setPixels into an in-memory Uint8ClampedArray that
+    //                      backs drawReal() when the user pans/shifts the preview
+    // realC is initialized from the preview ctx's getImageData, so in this stub
+    // it lives on canvasCtx.__imageData.
+    assert.ok(canvasCtx.__imageData, 'preview canvas should have a backing image data buffer');
     const { data } = canvasCtx.__imageData;
 
     // curColor defaults to [0, 0, 0, 1]. Find any pixel with alpha === 1.
