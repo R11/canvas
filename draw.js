@@ -1038,6 +1038,9 @@ AR.R11.draw = (function () {
             case 78: // N — toggle library modal
                 if (AR.R11.libraryUI) { AR.R11.libraryUI.toggle(); }
                 break;
+            case 77: // M — toggle layers panel
+                if (AR.R11.layerUI) { AR.R11.layerUI.toggle(); }
+                break;
             case 84:
                 break;
             case 219: // [ open bracket
