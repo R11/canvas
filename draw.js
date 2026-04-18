@@ -25,8 +25,16 @@ AR.R11.draw = (function () {
         zbit = Math.pow(2, zoom),
         ballGo = 0,
         max = 8,          // maximum selection level/zoom allowed
-        h = window.innerHeight,
-        w = window.innerWidth,
+        h = window.innerHeight,   // viewport height (pixels of the window)
+        w = window.innerWidth,    // viewport width
+        // The drawing surface is a separate concept from the viewport. It can
+        // be larger or smaller than the window, and can be resized at runtime
+        // via AR.R11.draw.setCanvasSize(w, h). When the drawing is larger than
+        // the viewport, the user pans with the mini-map / arrow keys / wiiu
+        // rstick; the viewport shows a window onto the drawing.
+        canvasW = w,
+        canvasH = h,
+        realC = new Uint8ClampedArray(canvasW * canvasH * 4),
         sw = 20, // setting width
         twoPI = Math.PI * 2,
         radians = Math.PI / 180,
@@ -168,12 +176,12 @@ AR.R11.draw = (function () {
             return findCtx;
         },
         cImage,
-        createCanvas = function (id, z, viz) {
+        createCanvas = function (id, z, viz, width, height) {
             var cv, ctx;
             cv = document.createElement("canvas");
             ctx = cv.getContext("2d");
-            cv.width = w;
-            cv.height = h;
+            cv.width = (width === undefined) ? w : width;
+            cv.height = (height === undefined) ? h : height;
             cv.style.zIndex = z || 1;  // create function to check if z/id is currently in use by another element
             cv.style.left = "0";
             cv.style.top = "0";
@@ -184,7 +192,7 @@ AR.R11.draw = (function () {
             return cv;
         },
         getPixel = function (x, y) {
-            return (x + y * w) * 4;
+            return (x + y * canvasW) * 4;
         },
         setPixels = function (data, x, y, r, g, b, a) {
             var index = getPixel(x, y);
@@ -274,17 +282,16 @@ AR.R11.draw = (function () {
             return step;
         },
         realCanvas = (function () {
-            var image, data,
-                cv = createCanvas("realCanvas", 1, false),
+            // realCanvas is the full-resolution mirror of the drawing surface,
+            // sized canvasW x canvasH. It's used as the drawImage source for
+            // the mini-map preview and as the target of exportImage.
+            var cv = createCanvas("realCanvas", 1, false, canvasW, canvasH),
                 ctx = cv.getContext("2d");
             ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, w, h);
-            image = document.getElementById("realCanvas").getContext('2d').getImageData(0, 0, w, h);
-            data = image.data;
-         //   image = ctx.getImageData(0, 0, cv.width, cv.height);
+            ctx.fillRect(0, 0, canvasW, canvasH);
             return {
                 get: function () {
-                    return data;
+                    return realC;
                 },
                 draw: function (x, y, rangeX, rangeY, color) {
                     ctx.fillStyle = color;
@@ -298,8 +305,6 @@ AR.R11.draw = (function () {
                 remainderW, remainderH,
                 cv = createCanvas("canvas", 2),
                 ctx = cv.getContext("2d"),
-                canvasImage = ctx.getImageData(0, 0, cv.width, cv.height),
-                realC = canvasImage.data,
                 rCanvas = document.getElementById("realCanvas");
             return {
                 update: function () {
@@ -348,12 +353,14 @@ AR.R11.draw = (function () {
                         y -= (state.rStickY * 5) | 0;
                     }
 
-                    x = (x <= 0) ? 0:
-                        (x >= w - xbit) ? w - xbit:
-                        x;
-                    y = (y <= 0) ? 0:
-                        (y >= h - ybit) ? h - ybit:
-                        y;
+                    // Clamp the pan offset so the visible window stays inside
+                    // the drawing surface. (x, y) is a real-pixel coord on the
+                    // drawing (canvasW x canvasH), and the view shows xbit x
+                    // ybit real pixels.
+                    var panMaxX = Math.max(0, canvasW - xbit),
+                        panMaxY = Math.max(0, canvasH - ybit);
+                    x = (x <= 0) ? 0 : (x >= panMaxX) ? panMaxX : x;
+                    y = (y <= 0) ? 0 : (y >= panMaxY) ? panMaxY : y;
                     
                     if (flag["mousedown"] === 1) {
                         // Destination size must be an integer multiple of the
@@ -728,10 +735,16 @@ AR.R11.draw = (function () {
             return {
                 miniBox: function (x, y) {
                     if (x && y) {
-                        miniX = displayX + (x / ratio) | 0;
-                        miniY = displayY + (y / ratio) | 0;
-                        miniW = displayW / zbit | 0;
-                        miniH = displayH / zbit | 0;
+                        // Position within the minimap scales with the actual
+                        // drawing size (canvasW/canvasH), not the viewport.
+                        // The red indicator box spans the view (xbit/ybit real
+                        // pixels) at the same scale.
+                        var sx = displayW / canvasW,
+                            sy = displayH / canvasH;
+                        miniX = displayX + (x * sx) | 0;
+                        miniY = displayY + (y * sy) | 0;
+                        miniW = (w / zbit * sx) | 0;
+                        miniH = (h / zbit * sy) | 0;
                     }
                     minictx.clearRect(displayX, displayY, displayW, displayH);
                     minictx.lineWidth = 1;
@@ -870,7 +883,7 @@ AR.R11.draw = (function () {
             case controls.grid.reduce:
                 grid.reduce();
                 break;
-            case controls.ballon:
+            case controls.ball.on:
                 toggle("ball");
                 if (ball) { ball.update(); }
                 ballGo = 1;
@@ -906,11 +919,11 @@ AR.R11.draw = (function () {
                 toggle("realCanvas", 1);
                 toggle("canvas", 0);
                 break;
-            case controls.eraseron:
+            case controls.eraser.on:
                 flag["eraser"] = 1;
        //         settings.subMenu();
                 break;
-            case controls.eraseroff:
+            case controls.eraser.off:
                 flag["eraser"] = 0;
                 break;
             case controls.save:
@@ -946,6 +959,65 @@ AR.R11.draw = (function () {
         };
         return {
             setBall: function (b) { ball = b; },
+            getCanvasSize: function () {
+                return { width: canvasW, height: canvasH };
+            },
+            getPixelBuffer: function () {
+                // The master Uint8ClampedArray backing the drawing surface.
+                // Useful for tests and for future save/export features.
+                return realC;
+            },
+            setCanvasSize: function (newW, newH, opts) {
+                opts = opts || {};
+                var preserve = (opts.preserve !== false),
+                    oldW = canvasW, oldH = canvasH,
+                    oldData = realC,
+                    newData = new Uint8ClampedArray(newW * newH * 4),
+                    rCv = document.getElementById("realCanvas"),
+                    rCtx, copyW, copyH, row, srcRow, dstRow, i,
+                    px, py, idx;
+                if (preserve) {
+                    copyW = Math.min(oldW, newW);
+                    copyH = Math.min(oldH, newH);
+                    for (row = 0; row < copyH; row += 1) {
+                        srcRow = row * oldW * 4;
+                        dstRow = row * newW * 4;
+                        for (i = 0; i < copyW * 4; i += 1) {
+                            newData[dstRow + i] = oldData[srcRow + i];
+                        }
+                    }
+                }
+                realC = newData;
+                canvasW = newW;
+                canvasH = newH;
+                // Resize the realCanvas DOM element (this clears its bitmap)
+                // and rebuild its contents from realC.
+                rCv.width = newW;
+                rCv.height = newH;
+                rCtx = rCv.getContext("2d");
+                rCtx.fillStyle = "white";
+                rCtx.fillRect(0, 0, newW, newH);
+                if (preserve) {
+                    for (py = 0; py < newH; py += 1) {
+                        for (px = 0; px < newW; px += 1) {
+                            idx = (px + py * newW) * 4;
+                            if (newData[idx + 3] !== 0) {
+                                rCtx.fillStyle = "rgba(" + newData[idx] + "," +
+                                    newData[idx + 1] + "," + newData[idx + 2] +
+                                    "," + newData[idx + 3] + ")";
+                                rCtx.fillRect(px, py, 1, 1);
+                            }
+                        }
+                    }
+                }
+                // Clamp current pan so the viewport stays inside the new drawing.
+                if (curX > newW) { curX = newW - 1; }
+                if (curY > newH) { curY = newH - 1; }
+                if (curX < 0) { curX = 0; }
+                if (curY < 0) { curY = 0; }
+                canvas.update();
+                canvas.shift(curX, curY);
+            },
             init: function () {
                 var controls = {};
                 controls = new Controls();

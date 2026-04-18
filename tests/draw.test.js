@@ -48,7 +48,7 @@ test('mousedown in drawable region fires fillRect on both canvases', () => {
 });
 
 test('mousedown writes the current color into the master pixel buffer', () => {
-    const { window, canvasCtx } = bootDraw();
+    const { window } = bootDraw();
 
     window.onmousedown({ pageX: 500, pageY: 400 });
 
@@ -57,10 +57,8 @@ test('mousedown writes the current color into the master pixel buffer', () => {
     //   2. realCanvas:     fillRect at final-resolution (source for mini-display)
     //   3. realC buffer:   setPixels into an in-memory Uint8ClampedArray that
     //                      backs drawReal() when the user pans/shifts the preview
-    // realC is initialized from the preview ctx's getImageData, so in this stub
-    // it lives on canvasCtx.__imageData.
-    assert.ok(canvasCtx.__imageData, 'preview canvas should have a backing image data buffer');
-    const { data } = canvasCtx.__imageData;
+    const data = window.AR.R11.draw.getPixelBuffer();
+    assert.ok(data, 'draw module should expose a master pixel buffer');
 
     // curColor defaults to [0, 0, 0, 1]. Find any pixel with alpha === 1.
     let found = -1;
@@ -92,18 +90,16 @@ test('mousedown snaps to the current grid cell', () => {
 });
 
 test('eraser flag swaps the fill to white and writes zeroed pixels', () => {
-    const { window, realCtx } = bootDraw();
+    const { window } = bootDraw();
 
     // Flip eraser on by simulating the keybinding for Q (keyCode 81).
     window.onkeydown({ keyCode: 81 });
 
     window.onmousedown({ pageX: 500, pageY: 400 });
 
-    const { data } = realCtx.__imageData;
-    // Eraser writes all zeros at the target pixel.
-    // curX/curY are w/2.5 | 0, h/2.5 | 0 — these offsets mean we don't know the
-    // exact index, so scan the whole buffer for a cleared block.
-    // More telling: verify NO pixel was written with alpha=1 (the curColor default).
+    const data = window.AR.R11.draw.getPixelBuffer();
+    // Eraser writes all zeros at the target pixel, so no pixel should ever
+    // have the curColor-default alpha of 1.
     let coloredPixels = 0;
     for (let i = 3; i < data.length; i += 4) {
         if (data[i] === 1) coloredPixels += 1;
@@ -219,6 +215,55 @@ test('drawReal no longer overshoots by a row/column after pan', () => {
     const overshoot = fills.filter(c => c.args[0] >= 1024 || c.args[1] >= 768);
     assert.strictEqual(overshoot.length, 0,
         'drawReal should not paint cells at or past xbit*zbit / ybit*zbit');
+});
+
+test('canvas size defaults to the viewport at init', () => {
+    const { window } = bootDraw();
+    const size = window.AR.R11.draw.getCanvasSize();
+    assert.strictEqual(size.width, window.innerWidth);
+    assert.strictEqual(size.height, window.innerHeight);
+    // Pixel buffer is sized to the drawing surface, not the viewport.
+    const buf = window.AR.R11.draw.getPixelBuffer();
+    assert.strictEqual(buf.length, size.width * size.height * 4);
+});
+
+test('setCanvasSize reallocates the master pixel buffer', () => {
+    const { window } = bootDraw();
+    window.AR.R11.draw.setCanvasSize(2048, 1024);
+    const size = window.AR.R11.draw.getCanvasSize();
+    assert.strictEqual(size.width, 2048);
+    assert.strictEqual(size.height, 1024);
+    const buf = window.AR.R11.draw.getPixelBuffer();
+    assert.strictEqual(buf.length, 2048 * 1024 * 4,
+        'pixel buffer must match the new canvas dimensions');
+});
+
+test('setCanvasSize preserves existing pixel data (top-left anchored)', () => {
+    const { window } = bootDraw();
+    // Draw a pixel (curColor=[0,0,0,1]) at real coord (471, 357).
+    window.onmousedown({ pageX: 500, pageY: 400 });
+    window.onmouseup({ pageX: 500, pageY: 400 });
+
+    // Grow the canvas — the existing pixel should remain at (471, 357).
+    window.AR.R11.draw.setCanvasSize(2048, 1024);
+    const buf = window.AR.R11.draw.getPixelBuffer();
+    const idx = (471 + 357 * 2048) * 4;
+    assert.strictEqual(buf[idx + 3], 1, 'alpha preserved after resize');
+    assert.strictEqual(buf[idx], 0, 'red channel preserved');
+});
+
+test('setCanvasSize with preserve:false starts from a blank buffer', () => {
+    const { window } = bootDraw();
+    window.onmousedown({ pageX: 500, pageY: 400 });
+    window.onmouseup({ pageX: 500, pageY: 400 });
+
+    window.AR.R11.draw.setCanvasSize(512, 512, { preserve: false });
+    const buf = window.AR.R11.draw.getPixelBuffer();
+    let nonZero = 0;
+    for (let i = 0; i < buf.length; i += 1) {
+        if (buf[i] !== 0) { nonZero += 1; break; }
+    }
+    assert.strictEqual(nonZero, 0, 'buffer should be fully zeroed with preserve:false');
 });
 
 test('mouseup clears mousedown flag (second click is independent)', () => {
