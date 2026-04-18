@@ -201,9 +201,48 @@ AR.R11.draw = (function () {
             data[index + 2] = b;
             data[index + 3] = a;
         },
-        exportImage = function (id) {
-            var canvas = document.getElementById(id).toDataURL("image/png");
-            window.open(canvas);
+        triggerDownload = function (href, filename) {
+            var a = document.createElement("a");
+            a.href = href;
+            a.download = filename;
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            if (typeof href === "string" && href.indexOf("blob:") === 0) {
+                // Give the browser a tick to start the download before revoking.
+                window.setTimeout(function () {
+                    try { URL.revokeObjectURL(href); } catch (ignore) {}
+                }, 1000);
+            }
+        },
+        exportImage = function (id, filename) {
+            // Default to the full-resolution realCanvas. "canvas" (the preview)
+            // was the old default but it only captures the current viewport at
+            // the current zoom — useless once the drawing is larger than the
+            // window.
+            var source = document.getElementById(id || "realCanvas");
+            filename = filename || "drawing.png";
+            if (!source) { return; }
+            var fallbackToDataUrl = function () {
+                triggerDownload(source.toDataURL("image/png"), filename);
+            };
+            if (source.toBlob) {
+                try {
+                    source.toBlob(function (blob) {
+                        if (blob) {
+                            triggerDownload(URL.createObjectURL(blob), filename);
+                        } else {
+                            // Some environments (jsdom without the canvas
+                            // package, older iOS) call back with null. Fall
+                            // back to the data-URL path in that case.
+                            fallbackToDataUrl();
+                        }
+                    }, "image/png");
+                    return;
+                } catch (ignore) { /* fall through */ }
+            }
+            fallbackToDataUrl();
         },
         drawReal = function (ctx, data, x, y, xbit, ybit) {
             var check, curPixel, a, b;
@@ -927,10 +966,7 @@ AR.R11.draw = (function () {
                 flag["eraser"] = 0;
                 break;
             case controls.save:
-                zoom = 1;
-                canvas.zoomout();
-              //  toggle("grid", 0);
-                exportImage("canvas");
+                exportImage("realCanvas");
                 break;
             case 84:
                 break;
@@ -966,6 +1002,12 @@ AR.R11.draw = (function () {
                 // The master Uint8ClampedArray backing the drawing surface.
                 // Useful for tests and for future save/export features.
                 return realC;
+            },
+            exportImage: function (opts) {
+                // Export the full drawing as a PNG download. Defaults to the
+                // realCanvas source and a "drawing.png" filename.
+                opts = opts || {};
+                exportImage(opts.id || "realCanvas", opts.filename || "drawing.png");
             },
             setCanvasSize: function (newW, newH, opts) {
                 opts = opts || {};

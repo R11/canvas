@@ -85,6 +85,10 @@ function makeDom({ scripts = ALL_SCRIPTS, excludeOnload = false } = {}) {
         return this.__ctx;
     };
     window.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,';
+    // jsdom's toBlob stub logs an error and never calls the callback — that
+    // hangs exportImage. Deleting the method forces draw.js's fallback
+    // toDataURL branch.
+    delete window.HTMLCanvasElement.prototype.toBlob;
     window.Image = class {
         constructor() { this.width = 100; this.height = 100; this.src = ''; this.name = ''; }
     };
