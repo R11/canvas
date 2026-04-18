@@ -1,0 +1,13 @@
+{
+  "name": "canvas",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Canvas-based drawing tool (vanilla JS, no build step).",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

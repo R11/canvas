@@ -2,8 +2,6 @@ window.onload = function () {
     AR.R11.home.init();
 }
 
-AR.R11.home = {};
-
 AR.R11.home = {
     init: function () {
         var set, set2,
@@ -162,7 +160,7 @@ AR.R11.home = {
                 },
                 mouseup: function () {
                     console.log("clicked!!");
-                    window.location = "canvas/oneObject.html";
+                    window.location = "draw.html";
                 }
             },
             button2 = {

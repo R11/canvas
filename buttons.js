@@ -31,8 +31,9 @@ AR.R11.Button = function (obj) {
     this.image = obj.image || null;
     
 
-    this.on = (obj.on) ? false: true;
+    this.on = (obj.on === false) ? false : true;
     this.pressed = 0;
+    this.hover = false;
 
     this.load = obj.load || null;
     this.click = obj.click || null;
@@ -170,8 +171,12 @@ AR.R11.Button.prototype.hoverStyle = function () {
     }
 }
 AR.R11.Button.prototype.contains = function(x, y) {
-  return  (this.x <= x) && (this.x + this.w >= x) &&
-          (this.y <= y) && (this.y + this.h >= y);
+  var bx = AR.R11.resolve(this.x),
+      by = AR.R11.resolve(this.y),
+      bw = AR.R11.resolve(this.w),
+      bh = AR.R11.resolve(this.h);
+  return (bx <= x) && (bx + bw >= x) &&
+         (by <= y) && (by + bh >= y);
 }
 
 

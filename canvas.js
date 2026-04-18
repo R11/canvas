@@ -11,7 +11,7 @@ AR.R11.Canvas = function (obj) {
     this.style.top = obj.top || "0";
     this.style.position = obj.position || "absolute";
     this.style.visibility = obj.visibility || 'visible';
-    this.on = obj.on || true;
+    this.on = (obj.on === false) ? false : true;
     if (this.on) {
         document.body.appendChild(this.canvas);
     }

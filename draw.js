@@ -1,4 +1,23 @@
-AR.R11.draw = {
+AR.R11.draw = (function () {
+    var next1 = AR.R11.next1,
+        back1 = AR.R11.back1,
+        contains = AR.R11.contains,
+        ball = null,
+        picker = { update: function () {} },
+        customFont = function (text, ctx, x, y, color, size, spacing, lineWidth, stroke) {
+            var t = new AR.R11.Text({
+                ctx: ctx,
+                text: "" + text,
+                x: x,
+                y: y,
+                size: size,
+                spacing: spacing,
+                lineWidth: lineWidth,
+                fillStyle: color,
+                strokeStyle: color
+            });
+            t.update();
+        },
         state,
         zoom = 3,    //  how zoomed in the image begins
         gz = zoom,   // selection level - as relates to zoom.  1, 2, 4, 8, 16 pixels, etc.
@@ -443,7 +462,7 @@ AR.R11.draw = {
                             fColor: "white",
                             font: 15
                         };
-                    ctx.clearRect(0, 0, menuW, h);
+                    ctx.clearRect(0, 0, menuWidth, h);
                     for (i = 0; i < numOptions; i += 1) {
                         w2 = options[i].length;
                         customFont(options[i], ctx, 6, 57, "black", 8, 3, 1.5, true);
@@ -840,7 +859,7 @@ AR.R11.draw = {
                 break;
             case controls.ballon:
                 toggle("ball");
-                ball.update();
+                if (ball) { ball.update(); }
                 ballGo = 1;
                 break;
             case 13: // return/enter
@@ -908,11 +927,12 @@ AR.R11.draw = {
             default:
                 return true;
             }
-            if (ballGo === 1) {
+            if (ballGo === 1 && ball) {
                 ball.update();
             }
         };
         return {
+            setBall: function (b) { ball = b; },
             init: function () {
                 var controls = {};
                 controls = new Controls();
@@ -930,7 +950,7 @@ AR.R11.draw = {
                     }
                     window.setInterval(buttons(controls), 20);
                 } else {
-                    ball.setBall(200, 200);
+                    if (ball && ball.setBall) { ball.setBall(200, 200); }
                     window.onkeydown = function (e) {
                         flag["keydown"] = 1;
                         buttons(controls, e);

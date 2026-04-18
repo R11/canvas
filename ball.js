@@ -66,79 +66,46 @@ AR.R11.Ball = function (obj) {
         shadow: 1 / 4,
         shadowAngle: 0
     }
-    oldBallX = this.x;
-    oldBallY = this.y;
-    cImage = getImage("canvas");
+    this.oldX = this.def.x;
+    this.oldY = this.def.y;
+    this.update();
+};
 
-}
 AR.R11.Ball.prototype.update = function (obj) {
-    var d = this.def;
-    this.ctx = obj.ctx || d.ctx;
-    this.r = obj.r || (typeof d.r === "function") ? d.r(): d.r;
-    this.x = obj.x || (typeof d.x === "function") ? d.x(): d.x;
-    this.y = obj.y || (typeof d.y === "function") ? d.y(): d.y;
-    this.state = obj.state || d.state();
-    this.shiftx = obj.shiftx || (typeof d.shiftx === "function") ? d.shiftx(): d.shiftx;
-    this.shifty = obj.shifty || (typeof d.shifty === "function") ? d.shifty(): d.shifty;
-    this.angleStart = obj.angleStart || (typeof d.angleStart === "function") ? d.angleStart(): d.angleStart;
-    this.angleEnd = obj.angleEnd || (typeof d.angleEnd === "function") ? d.angleEnd(): d.angleEnd;
-    this.fillStyle = obj.fillStyle || (typeof d.fillStyle === "function") ? d.fillStyle(): d.fillStyle;
-    this.strokeStyle = obj.strokeStyle || (typeof d.strokeStyle === "function") ? d.strokeStyle(): d.strokeStyle;
-    this.shadow = obj.shadow || (typeof d.shadow === "function") ? d.shadow(): d.shadow;
-    this.shadowAngle = obj.shadowAngle || (typeof d.shadowAngle === "function") ? d.shadowAngle(): d.shadowAngle;
-}
-AR.R11.Ball.prototype.checkCollision = function (zoom) {
-    var aX = 20,
-        aZ = 20,
-        aY = 1,
-        z = zoom || 1,
-        newX = (this.x - shiftX),
-        newY = (this.y - shiftY),
-        curPixel, i, xCorner, yCorner;
-    // loop through canvas 
-    if (newX >= (canvas.width + this.r * z)) {
-        newX = 1 - this.r * z;
-    }
-    if (newX <= -this.r * z) {
-        newX = canvas.width + this.r * z;
-    }
-    if (newY >= (canvas.height + this.r * z)) {
-        newY = 1 - this.r * z;
-    }
-    if (newY <= -this.r * z) {
-        newY = canvas.height + this.r * z;
-    }
-    for(i = 0 ; i <= 360 ; i += 15 ) {
-        xCorner = thisRadius * thisRadius * Math.cos(i * radians);
-        yCorner = thisRadius * thisRadius * Math.sin(i * radians);
-        curPixel = getPixel(newX + xCorner, newY + yCorner);
-        if (cImage.data[curPixel + 3] > 20) {
-            newX += shiftX;
-            newY += shiftY;
-        }
-    }
-    this.x = newX;
-    this.y = newY;
- //   thisGo = 0;
-}
-AR.R11.Ball.prototype.update = function (zoom) {
+    obj = obj || {};
+    AR.R11.updateSettings(this, this.def, obj);
+};
+
+AR.R11.Ball.prototype.setBall = function (x, y) {
+    this.oldX = this.x;
+    this.oldY = this.y;
+    this.x = x;
+    this.y = y;
+};
+
+AR.R11.Ball.prototype.draw = function (zoom) {
     var ctx = this.ctx,
-        z = zoom || 1
-    this.checkCollision();
-    ctx.clearRect(oldBallX - this.r - 50, oldBallY - this.r - 50, (this.r + 10) * 2 * 50, (this.r + 10) * 2 * 50);
-    // this
+        z = zoom || 1,
+        s = this.state || {},
+        gyroZ = s.gyroZ || 0,
+        angleY = s.angleY || 0,
+        radians = Math.PI / 180;
+    ctx.clearRect(this.oldX - this.r - 2, this.oldY - this.r - 2,
+                  (this.r + 4) * 2, (this.r + 4) * 2);
     ctx.beginPath();
-    ctx.arc(this.x + state.gyroZ * 5, this.y, this.r * z, 0, 2 * Math.PI, false);
+    ctx.arc(this.x + gyroZ * 5, this.y, this.r * z, 0, 2 * Math.PI, false);
     ctx.fillStyle = this.fillStyle;
     ctx.fill();
     ctx.lineWidth = 3;
     ctx.strokeStyle = this.strokeStyle;
     ctx.stroke();
-    // shadow
     ctx.beginPath();
-    ctx.arc(this.x + state.gyroZ * 5, this.y, (this.r - this.shadow) * z, (state.angleY * 360 + 50) * radians, (state.angleY * 360 + 360) * radians, true);
+    ctx.arc(this.x + gyroZ * 5, this.y, (this.r - this.shadow) * z,
+            (angleY * 360 + 50) * radians, (angleY * 360 + 360) * radians, true);
     ctx.lineWidth = 5;
     ctx.strokeStyle = 'red';
     ctx.stroke();
-}
+    this.oldX = this.x;
+    this.oldY = this.y;
+};
 
