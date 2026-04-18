@@ -15,6 +15,7 @@ const ALL_SCRIPTS = [
     'buttons.js',
     'ball.js',
     'hud.js',
+    'store.js',
     'home.js',
     'draw.js'
 ];
@@ -88,6 +89,11 @@ function makeDom({ scripts = ALL_SCRIPTS, excludeOnload = false } = {}) {
         constructor() { this.width = 100; this.height = 100; this.src = ''; this.name = ''; }
     };
     window.open = () => null;
+
+    // Install fake-indexeddb so AR.R11.store can run in tests. Each call
+    // creates a fresh in-memory DB (new FDBFactory), isolated per-window.
+    const { IDBFactory } = require('fake-indexeddb');
+    window.indexedDB = new IDBFactory();
 
     // Capture setInterval/setTimeout callbacks instead of actually scheduling them.
     // Otherwise the wiiu init branch keeps the jsdom event loop alive and the
