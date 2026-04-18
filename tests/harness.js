@@ -71,13 +71,20 @@ function makeCtxStub() {
     });
 }
 
-function makeDom({ scripts = ALL_SCRIPTS, excludeOnload = false } = {}) {
+function makeDom({ scripts = ALL_SCRIPTS, excludeOnload = false, viewport } = {}) {
     const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
         url: 'http://localhost/',
         runScripts: 'dangerously',
         pretendToBeVisual: true
     });
     const { window } = dom;
+    if (viewport) {
+        // jsdom defaults to 1024x768. Override window.innerWidth/Height for
+        // tests that care about layout on a specific viewport (e.g. the
+        // 854x480 Wii U gamepad).
+        Object.defineProperty(window, 'innerWidth', { value: viewport.width, configurable: true });
+        Object.defineProperty(window, 'innerHeight', { value: viewport.height, configurable: true });
+    }
     window.HTMLCanvasElement.prototype.getContext = function () {
         if (!this.__ctx) {
             const ctx = makeCtxStub();

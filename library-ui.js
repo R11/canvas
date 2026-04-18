@@ -62,7 +62,7 @@
         return h("li", {
             "data-id": rec.id,
             style: {
-                padding: "8px 10px",
+                padding: "10px 12px",
                 borderBottom: "1px solid #ddd",
                 display: "flex",
                 alignItems: "center",
@@ -71,12 +71,12 @@
             }
         }, [
             h("div", { style: { flex: "1", minWidth: "0" } }, [
-                h("div", { style: { fontWeight: "600" } }, [rec.name || "Untitled"]),
-                h("div", { style: { fontSize: "11px", color: "#777" } }, [meta])
+                h("div", { style: { fontWeight: "600", fontSize: "15px" } }, [rec.name || "Untitled"]),
+                h("div", { style: { fontSize: "13px", color: "#777", marginTop: "2px" } }, [meta])
             ]),
             h("button", {
                 style: {
-                    padding: "4px 10px", cursor: "pointer",
+                    padding: "8px 14px", cursor: "pointer", fontSize: "14px",
                     background: "#2a7", color: "white", border: "0", borderRadius: "3px"
                 },
                 onclick: function () {
@@ -91,7 +91,7 @@
             }, ["Load"]),
             h("button", {
                 style: {
-                    padding: "4px 10px", cursor: "pointer",
+                    padding: "8px 14px", cursor: "pointer", fontSize: "14px",
                     background: "#c44", color: "white", border: "0", borderRadius: "3px"
                 },
                 onclick: function () {
@@ -109,7 +109,7 @@
         while (listEl.firstChild) { listEl.removeChild(listEl.firstChild); }
         if (!records || records.length === 0) {
             listEl.appendChild(h("li", {
-                style: { padding: "16px", color: "#777", fontStyle: "italic" }
+                style: { padding: "20px", color: "#777", fontStyle: "italic", fontSize: "14px" }
             }, ["No saved drawings yet. Use Save Current to start a library."]));
             return;
         }
@@ -123,26 +123,27 @@
             type: "text",
             value: current.name || "Untitled",
             style: {
-                flex: "1", padding: "6px 8px", fontSize: "14px",
+                flex: "1", padding: "8px 10px", fontSize: "15px",
                 border: "1px solid #bbb", borderRadius: "3px"
             }
         });
 
         statusEl = h("div", {
-            style: { fontSize: "12px", color: "#555", padding: "6px 0", minHeight: "18px" }
+            style: { fontSize: "13px", color: "#555", padding: "6px 0", minHeight: "20px" }
         });
 
         listEl = h("ul", {
             style: {
                 margin: "0", padding: "0", listStyle: "none",
-                maxHeight: "420px", overflowY: "auto",
+                // Sized to fit 854x480 (Wii U gamepad) with the header above.
+                maxHeight: "300px", overflowY: "auto",
                 border: "1px solid #eee", borderRadius: "3px"
             }
         });
 
         var saveBtn = h("button", {
             style: {
-                padding: "6px 14px", cursor: "pointer",
+                padding: "8px 16px", cursor: "pointer", fontSize: "14px",
                 background: "#36c", color: "white", border: "0", borderRadius: "3px"
             },
             onclick: function () {
@@ -163,7 +164,8 @@
             style: {
                 position: "absolute", top: "8px", right: "10px",
                 background: "transparent", border: "0",
-                fontSize: "20px", cursor: "pointer", color: "#555"
+                fontSize: "26px", lineHeight: "1", cursor: "pointer", color: "#555",
+                padding: "4px 10px"
             },
             onclick: function () { AR.R11.libraryUI.close(); }
         }, ["×"]);
@@ -172,19 +174,23 @@
             style: {
                 position: "relative",
                 background: "white",
+                // Width capped so the modal fits comfortably on a 854x480
+                // Wii U gamepad screen with margin on either side.
                 width: "min(560px, 92vw)",
-                maxHeight: "86vh",
+                maxWidth: "780px",
+                maxHeight: "94vh",
                 borderRadius: "6px",
                 boxShadow: "0 6px 24px rgba(0,0,0,0.25)",
                 padding: "20px",
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px"
+                gap: "10px",
+                fontFamily: "system-ui, sans-serif"
             }
         }, [
             closeBtn,
-            h("div", { style: { fontSize: "18px", fontWeight: "700" } }, ["Library"]),
+            h("div", { style: { fontSize: "20px", fontWeight: "700" } }, ["Library"]),
             h("div", {
                 style: { display: "flex", gap: "8px", alignItems: "center" }
             }, [nameInput, saveBtn]),

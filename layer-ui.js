@@ -40,8 +40,8 @@
 
     function button(label, onclick, extra) {
         var s = {
-            border: "0", borderRadius: "2px", cursor: "pointer",
-            padding: "2px 6px", fontSize: "11px",
+            border: "0", borderRadius: "3px", cursor: "pointer",
+            padding: "6px 10px", fontSize: "14px",
             background: "#eee", color: "#333"
         };
         Object.keys(extra || {}).forEach(function (k) { s[k] = extra[k]; });
@@ -58,13 +58,13 @@
                 draw.setLayerVisibility(i, visBox.checked);
                 AR.R11.layerUI.refresh();
             },
-            style: { margin: "0 6px 0 0" }
+            style: { margin: "0 8px 0 0", width: "16px", height: "16px" }
         });
         visBox.checked = !!layer.visible;
 
         var nameSpan = h("span", {
             style: {
-                flex: "1", fontSize: "12px", fontWeight: isActive ? "700" : "400",
+                flex: "1", fontSize: "14px", fontWeight: isActive ? "700" : "400",
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 cursor: "text"
             },
@@ -87,7 +87,7 @@
             oninput: function () {
                 draw.setLayerOpacity(i, Number(opacity.value) / 100);
             },
-            style: { width: "70px" }
+            style: { width: "80px" }
         });
         opacity.value = String(Math.round((layer.opacity || 0) * 100));
 
@@ -119,8 +119,8 @@
             style: {
                 display: "flex",
                 alignItems: "center",
-                gap: "4px",
-                padding: "6px 8px",
+                gap: "6px",
+                padding: "8px",
                 borderBottom: "1px solid #eee",
                 background: isActive ? "#e8f0ff" : "transparent",
                 cursor: "pointer"
@@ -139,7 +139,9 @@
         var list = h("ul", {
             style: {
                 margin: "0", padding: "0", listStyle: "none",
-                maxHeight: "60vh", overflowY: "auto",
+                // Cap height for the 480px-tall Wii U gamepad screen so the
+                // Add/Duplicate row stays visible.
+                maxHeight: "260px", overflowY: "auto",
                 border: "1px solid #ddd", borderRadius: "3px"
             }
         });
@@ -150,16 +152,16 @@
         var addBtn = button("+ Add Layer", function () {
             draw.addLayer({});
             AR.R11.layerUI.refresh();
-        }, { background: "#36c", color: "white", padding: "6px 10px", fontSize: "12px" });
+        }, { background: "#36c", color: "white", padding: "8px 14px", fontSize: "14px" });
 
         var copyBtn = button("Duplicate Active", function () {
             draw.addLayer({ copyFrom: draw.getActiveLayerIndex() });
             AR.R11.layerUI.refresh();
-        }, { padding: "6px 10px", fontSize: "12px" });
+        }, { padding: "8px 14px", fontSize: "14px" });
 
         var title = h("div", {
             style: {
-                fontWeight: "700", fontSize: "14px", marginBottom: "6px",
+                fontWeight: "700", fontSize: "16px", marginBottom: "8px",
                 display: "flex", justifyContent: "space-between", alignItems: "center"
             }
         }, [
@@ -169,7 +171,8 @@
                 onclick: function () { AR.R11.layerUI.close(); },
                 style: {
                     background: "transparent", border: "0",
-                    fontSize: "16px", cursor: "pointer", color: "#666"
+                    fontSize: "22px", lineHeight: "1", cursor: "pointer",
+                    color: "#666", padding: "4px 8px"
                 }
             }, ["\u00d7"])
         ]);
@@ -179,7 +182,7 @@
         panelEl.appendChild(title);
         panelEl.appendChild(list);
         panelEl.appendChild(h("div", {
-            style: { display: "flex", gap: "6px", marginTop: "8px" }
+            style: { display: "flex", gap: "8px", marginTop: "10px" }
         }, [addBtn, copyBtn]));
     }
 
@@ -189,14 +192,15 @@
             "aria-label": "Layers",
             style: {
                 position: "fixed",
-                top: "20px",
-                right: "20px",
-                width: "min(320px, 90vw)",
+                top: "12px",
+                right: "12px",
+                // Width capped to leave canvas space on a 854x480 Wii U screen.
+                width: "min(360px, 90vw)",
                 background: "white",
                 border: "1px solid #ccc",
                 borderRadius: "4px",
                 boxShadow: "0 3px 14px rgba(0,0,0,0.15)",
-                padding: "10px",
+                padding: "12px",
                 zIndex: "9999",
                 boxSizing: "border-box",
                 fontFamily: "system-ui, sans-serif"
