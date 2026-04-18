@@ -970,6 +970,9 @@ AR.R11.draw = (function () {
             case controls.save:
                 exportImage("realCanvas");
                 break;
+            case 78: // N — toggle library modal
+                if (AR.R11.libraryUI) { AR.R11.libraryUI.toggle(); }
+                break;
             case 84:
                 break;
             case 219: // [ open bracket

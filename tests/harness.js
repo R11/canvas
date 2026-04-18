@@ -17,7 +17,8 @@ const ALL_SCRIPTS = [
     'hud.js',
     'store.js',
     'home.js',
-    'draw.js'
+    'draw.js',
+    'library-ui.js'
 ];
 
 function makeCtxStub() {
