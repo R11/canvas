@@ -4,6 +4,8 @@ AR.R11.draw = (function () {
         contains = AR.R11.contains,
         ball = null,
         picker = { update: function () {} },
+        currentRecordId = null,
+        currentRecordName = "Untitled",
         customFont = function (text, ctx, x, y, color, size, spacing, lineWidth, stroke) {
             var t = new AR.R11.Text({
                 ctx: ctx,
@@ -1062,6 +1064,101 @@ AR.R11.draw = (function () {
                 // Repaint preview.
                 canvas.update();
                 canvas.shift(curX, curY);
+            },
+            getCurrent: function () {
+                return { id: currentRecordId, name: currentRecordName };
+            },
+            setCurrentName: function (name) {
+                currentRecordName = name || "Untitled";
+            },
+            saveToLibrary: function (opts) {
+                // Persist the current drawing to AR.R11.store. If no id is
+                // passed and there's no currentRecordId, a new id is minted
+                // and becomes the current record.
+                opts = opts || {};
+                var store = AR.R11.store;
+                if (!store) {
+                    return Promise.reject(new Error("AR.R11.store not loaded"));
+                }
+                var id = opts.id || currentRecordId || store.newId(),
+                    name = opts.name || currentRecordName,
+                    // Clone realC so mutating the drawing later doesn't edit
+                    // the stored record (most IDB drivers copy on put, but
+                    // we don't want to depend on that).
+                    dataCopy = new Uint8ClampedArray(realC),
+                    record = {
+                        id: id,
+                        name: name,
+                        width: canvasW,
+                        height: canvasH,
+                        layers: [{
+                            name: "Layer 1",
+                            opacity: 1,
+                            visible: true,
+                            data: dataCopy
+                        }]
+                    };
+                return store.put(record).then(function (saved) {
+                    currentRecordId = saved.id;
+                    currentRecordName = saved.name;
+                    return saved;
+                });
+            },
+            loadFromLibrary: function (id) {
+                // Fetch a record and replace the current drawing with it.
+                // Resizes the canvas to match the stored dimensions.
+                var self = this, store = AR.R11.store;
+                if (!store) {
+                    return Promise.reject(new Error("AR.R11.store not loaded"));
+                }
+                return store.get(id).then(function (record) {
+                    if (!record) {
+                        throw new Error("loadFromLibrary: no record for id " + id);
+                    }
+                    var firstLayer = (record.layers && record.layers[0]) || null;
+                    if (!firstLayer || !firstLayer.data) {
+                        throw new Error("loadFromLibrary: record has no layer data");
+                    }
+                    self.importPixels(firstLayer.data, record.width, record.height,
+                        { mode: "replace", resizeCanvas: true });
+                    currentRecordId = record.id;
+                    currentRecordName = record.name || "Untitled";
+                    return record;
+                });
+            },
+            listLibrary: function (opts) {
+                // List all saved drawings. By default strips heavy fields
+                // (layers, thumbnail) so the caller can render a gallery
+                // without pulling every pixel buffer into memory.
+                opts = opts || {};
+                var store = AR.R11.store;
+                if (!store) {
+                    return Promise.reject(new Error("AR.R11.store not loaded"));
+                }
+                return store.list().then(function (records) {
+                    if (opts.includeData) { return records; }
+                    return records.map(function (r) {
+                        return {
+                            id: r.id,
+                            name: r.name,
+                            width: r.width,
+                            height: r.height,
+                            createdAt: r.createdAt,
+                            updatedAt: r.updatedAt,
+                            thumbnail: r.thumbnail
+                        };
+                    });
+                });
+            },
+            deleteFromLibrary: function (id) {
+                var store = AR.R11.store;
+                if (!store) {
+                    return Promise.reject(new Error("AR.R11.store not loaded"));
+                }
+                if (id === currentRecordId) {
+                    currentRecordId = null;
+                }
+                return store.delete(id);
             },
             importImage: function (fileOrBlob, opts) {
                 // Async import via browser decoding. Returns a Promise that
