@@ -43,7 +43,7 @@ test('home.init runs without throwing', () => {
 
 test('draw.init runs without throwing', () => {
     const { window } = makeDom({
-        scripts: ['init.js', 'canvas.js', 'font.js', 'buttons.js', 'ball.js', 'hud.js', 'draw.js'],
+        scripts: ['init.js', 'canvas.js', 'font.js', 'text.js', 'buttons.js', 'ball.js', 'hud.js', 'draw.js'],
         excludeOnload: true
     });
     window.AR.R11.draw.init();

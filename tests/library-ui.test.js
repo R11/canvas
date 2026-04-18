@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const { makeDom } = require('./harness');
 
 const DRAW_SCRIPTS = [
-    'init.js', 'canvas.js', 'font.js', 'buttons.js', 'ball.js',
+    'init.js', 'canvas.js', 'font.js', 'text.js', 'buttons.js', 'ball.js',
     'hud.js', 'store.js', 'draw.js', 'library-ui.js'
 ];
 

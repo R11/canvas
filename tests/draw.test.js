@@ -6,7 +6,7 @@ const assert = require('node:assert');
 const { makeDom } = require('./harness');
 
 const DRAW_SCRIPTS = [
-    'init.js', 'canvas.js', 'font.js', 'buttons.js', 'ball.js', 'hud.js', 'draw.js'
+    'init.js', 'canvas.js', 'font.js', 'text.js', 'buttons.js', 'ball.js', 'hud.js', 'draw.js'
 ];
 
 function bootDraw() {

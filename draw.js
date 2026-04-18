@@ -7,18 +7,15 @@ AR.R11.draw = (function () {
         currentRecordId = null,
         currentRecordName = "Untitled",
         customFont = function (text, ctx, x, y, color, size, spacing, lineWidth, stroke) {
-            var t = new AR.R11.Text({
-                ctx: ctx,
-                text: "" + text,
-                x: x,
-                y: y,
-                size: size,
-                spacing: spacing,
-                lineWidth: lineWidth,
-                fillStyle: color,
-                strokeStyle: color
+            // Defers to AR.R11.text.draw, which dispatches to either the
+            // bitmap font (default, sideways-capable via opts.angle) or
+            // ctx.fillText (when AR.R11.text.setDefault('font', 'native')
+            // has been called).
+            AR.R11.text.draw(ctx, "" + text, {
+                x: x, y: y,
+                size: size, spacing: spacing, lineWidth: lineWidth,
+                color: color
             });
-            t.update();
         },
         state,
         zoom = 3,    //  how zoomed in the image begins

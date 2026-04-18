@@ -12,6 +12,7 @@ const ALL_SCRIPTS = [
     'init.js',
     'canvas.js',
     'font.js',
+    'text.js',
     'buttons.js',
     'ball.js',
     'hud.js',

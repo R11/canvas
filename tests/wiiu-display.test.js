@@ -12,7 +12,7 @@ const { makeDom } = require('./harness');
 const WIIU = { width: 854, height: 480 };
 
 const DRAW_SCRIPTS = [
-    'init.js', 'canvas.js', 'font.js', 'buttons.js', 'ball.js',
+    'init.js', 'canvas.js', 'font.js', 'text.js', 'buttons.js', 'ball.js',
     'hud.js', 'store.js', 'draw.js', 'library-ui.js', 'layer-ui.js'
 ];
 
