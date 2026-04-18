@@ -20,16 +20,31 @@ const ALL_SCRIPTS = [
 ];
 
 function makeCtxStub() {
-    // Proxy so any property access returns a no-op function and writes succeed.
-    const store = { canvas: null, lineWidth: 1, fillStyle: '#000', strokeStyle: '#000' };
+    const store = {
+        canvas: null,
+        lineWidth: 1,
+        fillStyle: '#000',
+        strokeStyle: '#000',
+        __calls: [],
+        __imageData: null
+    };
     return new Proxy(store, {
         get(target, prop) {
             if (prop in target) return target[prop];
             if (prop === 'getImageData') {
-                return (sx, sy, sw, sh) => ({
-                    data: new Uint8ClampedArray(Math.max(1, sw * sh * 4)),
-                    width: sw, height: sh
-                });
+                return (sx, sy, sw, sh) => {
+                    // Cache ImageData per ctx so setPixels writes persist across calls.
+                    if (!target.__imageData ||
+                        target.__imageData.width !== sw ||
+                        target.__imageData.height !== sh) {
+                        target.__imageData = {
+                            data: new Uint8ClampedArray(Math.max(1, sw * sh * 4)),
+                            width: sw, height: sh
+                        };
+                    }
+                    target.__calls.push({ method: 'getImageData', args: [sx, sy, sw, sh] });
+                    return target.__imageData;
+                };
             }
             if (prop === 'createImageData') {
                 return (w, h) => ({
@@ -37,11 +52,17 @@ function makeCtxStub() {
                     width: w, height: h
                 });
             }
-            // everything else is a no-op drawing call
-            return () => undefined;
+            // Any other method is recorded as a no-op.
+            return (...args) => {
+                target.__calls.push({ method: prop, args });
+                return undefined;
+            };
         },
         set(target, prop, value) {
             target[prop] = value;
+            if (!prop.startsWith('__')) {
+                target.__calls.push({ method: 'set:' + prop, value });
+            }
             return true;
         }
     });
