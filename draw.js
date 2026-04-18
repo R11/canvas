@@ -36,7 +36,69 @@ AR.R11.draw = (function () {
         // rstick; the viewport shows a window onto the drawing.
         canvasW = w,
         canvasH = h,
+        // realC is the *composite* pixel buffer — the source of truth for
+        // what the user sees. It's rebuilt by recomposite() from the layers
+        // array after every change.
         realC = new Uint8ClampedArray(canvasW * canvasH * 4),
+        // Layers: each holds its own Uint8ClampedArray. Draws write into
+        // the active layer's data; recomposite() blends every visible layer
+        // bottom-up into realC. At init there's a single opaque layer so the
+        // pipeline behaves identically to the pre-layer single-buffer model.
+        layers = [{
+            name: "Layer 1",
+            opacity: 1,
+            visible: true,
+            data: new Uint8ClampedArray(canvasW * canvasH * 4)
+        }],
+        activeLayerIndex = 0,
+        needsRecomposite = false,
+        recomposite = function () {
+            // Source-over alpha blending, bottom-up. O(pixels * layers); for
+            // typical canvas sizes this runs in a handful of ms per call.
+            var n = canvasW * canvasH, total = n * 4, i, li, layer, ld, op, p, lp,
+                srcA, dstA, outA;
+            for (i = 0; i < total; i += 1) { realC[i] = 0; }
+            for (li = 0; li < layers.length; li += 1) {
+                layer = layers[li];
+                if (!layer.visible) { continue; }
+                op = (typeof layer.opacity === "number") ? layer.opacity : 1;
+                if (op <= 0) { continue; }
+                ld = layer.data;
+                for (p = 0; p < n; p += 1) {
+                    lp = p * 4;
+                    srcA = (ld[lp + 3] / 255) * op;
+                    if (srcA <= 0) { continue; }
+                    dstA = realC[lp + 3] / 255;
+                    outA = srcA + dstA * (1 - srcA);
+                    if (outA <= 0) { continue; }
+                    realC[lp]     = (ld[lp]     * srcA + realC[lp]     * dstA * (1 - srcA)) / outA;
+                    realC[lp + 1] = (ld[lp + 1] * srcA + realC[lp + 1] * dstA * (1 - srcA)) / outA;
+                    realC[lp + 2] = (ld[lp + 2] * srcA + realC[lp + 2] * dstA * (1 - srcA)) / outA;
+                    realC[lp + 3] = outA * 255;
+                }
+            }
+            needsRecomposite = false;
+            // Mirror realC onto the realCanvas DOM element so exports + the
+            // mini-display stay in sync. putImageData is the fast path; in
+            // tests the stub makes it a no-op.
+            var rCv = document.getElementById("realCanvas");
+            if (rCv) {
+                var rCtx = rCv.getContext("2d");
+                rCtx.fillStyle = "white";
+                rCtx.fillRect(0, 0, canvasW, canvasH);
+                if (rCtx.putImageData) {
+                    try {
+                        var img = rCtx.createImageData(canvasW, canvasH);
+                        // Copy realC byte-by-byte. ImageData.data is writable
+                        // but may not share the same backing buffer.
+                        for (i = 0; i < total; i += 1) {
+                            img.data[i] = realC[i];
+                        }
+                        rCtx.putImageData(img, 0, 0);
+                    } catch (ignore) { /* older fallback: per-pixel fillRect */ }
+                }
+            }
+        },
         sw = 20, // setting width
         twoPI = Math.PI * 2,
         radians = Math.PI / 180,
@@ -357,7 +419,7 @@ AR.R11.draw = (function () {
                     
                 },
                 draw: function (x, y) {
-                    var m, n,
+                    var m, n, activeData,
                         fill = (flag["eraser"] === 0) ? fillStyle: "white";
                     curZoom = gz - zoom;
                     range = Math.pow(2, curZoom);
@@ -370,18 +432,21 @@ AR.R11.draw = (function () {
                     ctx.fillRect(startX, startY, bit, bit);
                     rX = curX + gridX * range;
                     rY = curY + gridY * range;
-                    realCanvas.draw(rX, rY, range, range, fill);
+                    // Writes land on the active layer's buffer; the realC
+                    // composite gets rebuilt at the end of the brush stroke.
+                    activeData = layers[activeLayerIndex].data;
                     for (m = 0; m <= range - 1; m += 1) {
-                        for (n = 0; n <= range - 1; n += 1) {    
+                        for (n = 0; n <= range - 1; n += 1) {
                             tempX = rX + m;
                             tempY = rY + n;
                             if (flag["eraser"] === 0) {
-                                setPixels(realC, tempX, tempY, curColor[0], curColor[1], curColor[2], curColor[3]);
+                                setPixels(activeData, tempX, tempY, curColor[0], curColor[1], curColor[2], curColor[3]);
                             } else {
-                                setPixels(realC, tempX, tempY, 0, 0, 0, 0);
+                                setPixels(activeData, tempX, tempY, 0, 0, 0, 0);
                             }
                         }
                     }
+                    recomposite();
                     miniDisplay.updateImage(rCanvas);
                 },
                 shift: function (x, y) {
@@ -1004,10 +1069,120 @@ AR.R11.draw = (function () {
                 return { width: canvasW, height: canvasH };
             },
             getPixelBuffer: function () {
-                // The master Uint8ClampedArray backing the drawing surface.
-                // Useful for tests and for future save/export features.
+                // The composited Uint8ClampedArray the user sees. Rebuilt
+                // from layers[] after every draw.
                 return realC;
             },
+            // ----- Layers ---------------------------------------------------
+            getLayerCount: function () { return layers.length; },
+            getActiveLayerIndex: function () { return activeLayerIndex; },
+            getLayers: function () {
+                // Return a metadata-only copy. The caller gets to see each
+                // layer's name/opacity/visibility without touching the data
+                // buffer (which can be large and is live).
+                return layers.map(function (l, i) {
+                    return {
+                        index: i,
+                        name: l.name,
+                        opacity: l.opacity,
+                        visible: l.visible
+                    };
+                });
+            },
+            getLayerData: function (index) {
+                if (index < 0 || index >= layers.length) { return null; }
+                return layers[index].data;
+            },
+            setActiveLayerIndex: function (index) {
+                if (index < 0 || index >= layers.length) {
+                    throw new Error("setActiveLayerIndex: index out of range");
+                }
+                activeLayerIndex = index;
+            },
+            addLayer: function (opts) {
+                // Insert a new blank layer above the active one (or at the
+                // end if no active), and make it active.
+                //   opts.name:      display name; default "Layer N"
+                //   opts.opacity:   default 1
+                //   opts.copyFrom:  index of an existing layer to duplicate
+                opts = opts || {};
+                var data;
+                if (typeof opts.copyFrom === "number") {
+                    if (opts.copyFrom < 0 || opts.copyFrom >= layers.length) {
+                        throw new Error("addLayer: copyFrom out of range");
+                    }
+                    data = new Uint8ClampedArray(layers[opts.copyFrom].data);
+                } else {
+                    data = new Uint8ClampedArray(canvasW * canvasH * 4);
+                }
+                var layer = {
+                    name: opts.name || ("Layer " + (layers.length + 1)),
+                    opacity: (typeof opts.opacity === "number") ? opts.opacity : 1,
+                    visible: true,
+                    data: data
+                };
+                var insertAt = activeLayerIndex + 1;
+                layers.splice(insertAt, 0, layer);
+                activeLayerIndex = insertAt;
+                recomposite();
+                return this.getLayers()[activeLayerIndex];
+            },
+            removeLayer: function (index) {
+                if (layers.length <= 1) {
+                    throw new Error("removeLayer: can't remove the last layer");
+                }
+                if (index < 0 || index >= layers.length) {
+                    throw new Error("removeLayer: index out of range");
+                }
+                layers.splice(index, 1);
+                if (activeLayerIndex >= layers.length) {
+                    activeLayerIndex = layers.length - 1;
+                } else if (activeLayerIndex > index) {
+                    activeLayerIndex -= 1;
+                }
+                recomposite();
+            },
+            moveLayer: function (fromIndex, toIndex) {
+                if (fromIndex < 0 || fromIndex >= layers.length ||
+                    toIndex < 0 || toIndex >= layers.length) {
+                    throw new Error("moveLayer: index out of range");
+                }
+                if (fromIndex === toIndex) { return; }
+                var moved = layers.splice(fromIndex, 1)[0];
+                layers.splice(toIndex, 0, moved);
+                // Keep the active layer pointer anchored to the moved layer
+                // when the caller moves it, or shift it along otherwise.
+                if (activeLayerIndex === fromIndex) {
+                    activeLayerIndex = toIndex;
+                } else if (fromIndex < activeLayerIndex && toIndex >= activeLayerIndex) {
+                    activeLayerIndex -= 1;
+                } else if (fromIndex > activeLayerIndex && toIndex <= activeLayerIndex) {
+                    activeLayerIndex += 1;
+                }
+                recomposite();
+            },
+            setLayerOpacity: function (index, opacity) {
+                if (index < 0 || index >= layers.length) {
+                    throw new Error("setLayerOpacity: index out of range");
+                }
+                opacity = Math.max(0, Math.min(1, opacity));
+                layers[index].opacity = opacity;
+                recomposite();
+            },
+            setLayerVisibility: function (index, visible) {
+                if (index < 0 || index >= layers.length) {
+                    throw new Error("setLayerVisibility: index out of range");
+                }
+                layers[index].visible = !!visible;
+                recomposite();
+            },
+            setLayerName: function (index, name) {
+                if (index < 0 || index >= layers.length) {
+                    throw new Error("setLayerName: index out of range");
+                }
+                layers[index].name = name || "Layer";
+            },
+            recomposite: function () { recomposite(); },
             exportImage: function (opts) {
                 // Export the full drawing as a PNG download. Defaults to the
                 // realCanvas source and a "drawing.png" filename.
@@ -1015,56 +1190,45 @@ AR.R11.draw = (function () {
                 exportImage(opts.id || "realCanvas", opts.filename || "drawing.png");
             },
             importPixels: function (pixelData, srcW, srcH, opts) {
-                // Replace or overlay the current drawing with a raw
+                // Replace or overlay the active layer with a raw
                 // Uint8ClampedArray. `pixelData` length must be srcW*srcH*4.
                 //   opts.mode:          "replace" (default) or "overlay"
                 //   opts.resizeCanvas:  true (default) resizes the drawing
                 //                       surface to srcW x srcH when in
-                //                       replace mode; false leaves it alone
-                //                       and blits at the top-left.
+                //                       replace mode; false leaves it alone.
                 opts = opts || {};
                 var mode = opts.mode || "replace",
                     resize = (opts.resizeCanvas !== false) && (mode === "replace");
-                if (!(pixelData instanceof Uint8ClampedArray) &&
-                    !(pixelData && pixelData.length === srcW * srcH * 4)) {
+                if (!pixelData || pixelData.length !== srcW * srcH * 4) {
                     throw new Error("importPixels: pixelData must be a typed byte array sized srcW*srcH*4");
                 }
-                if (resize) {
-                    // Use setCanvasSize with preserve:false to start clean,
-                    // then blit the imported pixels in at (0, 0).
-                    this.setCanvasSize(srcW, srcH, { preserve: false });
+                if (resize && (srcW !== canvasW || srcH !== canvasH)) {
+                    // preserve:true keeps the other layers intact. The active
+                    // layer's stale data gets wiped below anyway in replace
+                    // mode.
+                    this.setCanvasSize(srcW, srcH, { preserve: true });
                 }
-                var rCv = document.getElementById("realCanvas"),
-                    rCtx = rCv.getContext("2d"),
+                var active = layers[activeLayerIndex].data,
                     copyW = Math.min(srcW, canvasW),
                     copyH = Math.min(srcH, canvasH),
-                    dx, dy, sIdx, tIdx;
+                    dx, dy, sIdx, tIdx, i;
                 if (mode === "replace") {
-                    // Wipe realC and realCanvas before blitting.
-                    for (var i = 0; i < realC.length; i += 1) { realC[i] = 0; }
-                    rCtx.fillStyle = "white";
-                    rCtx.fillRect(0, 0, canvasW, canvasH);
+                    for (i = 0; i < active.length; i += 1) { active[i] = 0; }
                 }
                 for (dy = 0; dy < copyH; dy += 1) {
                     for (dx = 0; dx < copyW; dx += 1) {
                         sIdx = (dx + dy * srcW) * 4;
                         tIdx = (dx + dy * canvasW) * 4;
                         if (mode === "overlay" && pixelData[sIdx + 3] === 0) {
-                            continue;  // skip transparent pixels in overlay
+                            continue;
                         }
-                        realC[tIdx]     = pixelData[sIdx];
-                        realC[tIdx + 1] = pixelData[sIdx + 1];
-                        realC[tIdx + 2] = pixelData[sIdx + 2];
-                        realC[tIdx + 3] = pixelData[sIdx + 3];
-                        if (pixelData[sIdx + 3] !== 0) {
-                            rCtx.fillStyle = "rgba(" + pixelData[sIdx] + "," +
-                                pixelData[sIdx + 1] + "," + pixelData[sIdx + 2] +
-                                "," + pixelData[sIdx + 3] + ")";
-                            rCtx.fillRect(dx, dy, 1, 1);
-                        }
+                        active[tIdx]     = pixelData[sIdx];
+                        active[tIdx + 1] = pixelData[sIdx + 1];
+                        active[tIdx + 2] = pixelData[sIdx + 2];
+                        active[tIdx + 3] = pixelData[sIdx + 3];
                     }
                 }
-                // Repaint preview.
+                recomposite();
                 canvas.update();
                 canvas.shift(curX, curY);
             },
@@ -1085,21 +1249,21 @@ AR.R11.draw = (function () {
                 }
                 var id = opts.id || currentRecordId || store.newId(),
                     name = opts.name || currentRecordName,
-                    // Clone realC so mutating the drawing later doesn't edit
-                    // the stored record (most IDB drivers copy on put, but
-                    // we don't want to depend on that).
-                    dataCopy = new Uint8ClampedArray(realC),
                     record = {
                         id: id,
                         name: name,
                         width: canvasW,
                         height: canvasH,
-                        layers: [{
-                            name: "Layer 1",
-                            opacity: 1,
-                            visible: true,
-                            data: dataCopy
-                        }]
+                        // Persist every layer; clone each data buffer so later
+                        // edits to the drawing don't leak into stored records.
+                        layers: layers.map(function (l) {
+                            return {
+                                name: l.name,
+                                opacity: l.opacity,
+                                visible: l.visible,
+                                data: new Uint8ClampedArray(l.data)
+                            };
+                        })
                     };
                 return store.put(record).then(function (saved) {
                     currentRecordId = saved.id;
@@ -1118,12 +1282,24 @@ AR.R11.draw = (function () {
                     if (!record) {
                         throw new Error("loadFromLibrary: no record for id " + id);
                     }
-                    var firstLayer = (record.layers && record.layers[0]) || null;
-                    if (!firstLayer || !firstLayer.data) {
-                        throw new Error("loadFromLibrary: record has no layer data");
+                    if (!record.layers || !record.layers.length) {
+                        throw new Error("loadFromLibrary: record has no layers");
                     }
-                    self.importPixels(firstLayer.data, record.width, record.height,
-                        { mode: "replace", resizeCanvas: true });
+                    // Resize first (preserve:false wipes everything), then
+                    // rebuild layers from the record and recomposite.
+                    self.setCanvasSize(record.width, record.height, { preserve: false });
+                    layers = record.layers.map(function (l) {
+                        return {
+                            name: l.name || "Layer",
+                            opacity: (typeof l.opacity === "number") ? l.opacity : 1,
+                            visible: (l.visible !== false),
+                            data: new Uint8ClampedArray(l.data)
+                        };
+                    });
+                    activeLayerIndex = 0;
+                    recomposite();
+                    canvas.update();
+                    canvas.shift(curX, curY);
                     currentRecordId = record.id;
                     currentRecordName = record.name || "Untitled";
                     return record;
@@ -1212,47 +1388,35 @@ AR.R11.draw = (function () {
             setCanvasSize: function (newW, newH, opts) {
                 opts = opts || {};
                 var preserve = (opts.preserve !== false),
-                    oldW = canvasW, oldH = canvasH,
-                    oldData = realC,
-                    newData = new Uint8ClampedArray(newW * newH * 4),
+                    oldW = canvasW,
                     rCv = document.getElementById("realCanvas"),
-                    rCtx, copyW, copyH, row, srcRow, dstRow, i,
-                    px, py, idx;
-                if (preserve) {
-                    copyW = Math.min(oldW, newW);
-                    copyH = Math.min(oldH, newH);
-                    for (row = 0; row < copyH; row += 1) {
-                        srcRow = row * oldW * 4;
-                        dstRow = row * newW * 4;
-                        for (i = 0; i < copyW * 4; i += 1) {
-                            newData[dstRow + i] = oldData[srcRow + i];
-                        }
-                    }
-                }
-                realC = newData;
-                canvasW = newW;
-                canvasH = newH;
-                // Resize the realCanvas DOM element (this clears its bitmap)
-                // and rebuild its contents from realC.
-                rCv.width = newW;
-                rCv.height = newH;
-                rCtx = rCv.getContext("2d");
-                rCtx.fillStyle = "white";
-                rCtx.fillRect(0, 0, newW, newH);
-                if (preserve) {
-                    for (py = 0; py < newH; py += 1) {
-                        for (px = 0; px < newW; px += 1) {
-                            idx = (px + py * newW) * 4;
-                            if (newData[idx + 3] !== 0) {
-                                rCtx.fillStyle = "rgba(" + newData[idx] + "," +
-                                    newData[idx + 1] + "," + newData[idx + 2] +
-                                    "," + newData[idx + 3] + ")";
-                                rCtx.fillRect(px, py, 1, 1);
+                    copyW, copyH, li, oldData, newData, row, srcRow, dstRow, i;
+                // Resize every layer's buffer (keeps the layer stack intact).
+                for (li = 0; li < layers.length; li += 1) {
+                    oldData = layers[li].data;
+                    newData = new Uint8ClampedArray(newW * newH * 4);
+                    if (preserve) {
+                        copyW = Math.min(oldW, newW);
+                        copyH = Math.min(canvasH, newH);
+                        for (row = 0; row < copyH; row += 1) {
+                            srcRow = row * oldW * 4;
+                            dstRow = row * newW * 4;
+                            for (i = 0; i < copyW * 4; i += 1) {
+                                newData[dstRow + i] = oldData[srcRow + i];
                             }
                         }
                     }
+                    layers[li].data = newData;
                 }
-                // Clamp current pan so the viewport stays inside the new drawing.
+                realC = new Uint8ClampedArray(newW * newH * 4);
+                canvasW = newW;
+                canvasH = newH;
+                // Resize the realCanvas DOM element — clears its bitmap, will be
+                // rebuilt by recomposite() below.
+                rCv.width = newW;
+                rCv.height = newH;
+                recomposite();
+                // Clamp pan so the viewport stays inside the new drawing.
                 if (curX > newW) { curX = newW - 1; }
                 if (curY > newH) { curY = newH - 1; }
                 if (curX < 0) { curX = 0; }
