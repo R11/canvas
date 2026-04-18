@@ -118,33 +118,42 @@
 
     function build() {
         var current = AR.R11.draw.getCurrent();
+        var vp = AR.R11.viewportClass();
+        // Width: narrow mobile gets a sheet (96vw); everything else a centered
+        // modal capped at 640px (reads well on desktop without feeling empty).
+        var panelWidth = vp.narrow ? "96vw" : "min(640px, 92vw)";
+        var panelPadding = vp.short ? "12px" : (vp.narrow ? "14px" : "20px");
+        var panelGap = vp.short ? "6px" : "10px";
 
         nameInput = h("input", {
             type: "text",
             value: current.name || "Untitled",
             style: {
                 flex: "1", padding: "8px 10px", fontSize: "15px",
+                minWidth: "0",  // allow shrinking on narrow viewports
                 border: "1px solid #bbb", borderRadius: "3px"
             }
         });
 
         statusEl = h("div", {
-            style: { fontSize: "13px", color: "#555", padding: "6px 0", minHeight: "20px" }
+            style: { fontSize: "13px", color: "#555", padding: "4px 0", minHeight: "18px" }
         });
 
+        // The list fills remaining vertical space inside the flex panel, so
+        // maxHeight scales naturally with viewport height.
         listEl = h("ul", {
             style: {
                 margin: "0", padding: "0", listStyle: "none",
-                // Sized to fit 854x480 (Wii U gamepad) with the header above.
-                maxHeight: "300px", overflowY: "auto",
+                flex: "1 1 auto", minHeight: "100px", overflowY: "auto",
                 border: "1px solid #eee", borderRadius: "3px"
             }
         });
 
         var saveBtn = h("button", {
             style: {
-                padding: "8px 16px", cursor: "pointer", fontSize: "14px",
-                background: "#36c", color: "white", border: "0", borderRadius: "3px"
+                padding: "8px 14px", cursor: "pointer", fontSize: "14px",
+                background: "#36c", color: "white", border: "0", borderRadius: "3px",
+                flexShrink: "0"
             },
             onclick: function () {
                 var name = nameInput.value || "Untitled";
@@ -162,7 +171,7 @@
         var closeBtn = h("button", {
             "aria-label": "Close",
             style: {
-                position: "absolute", top: "8px", right: "10px",
+                position: "absolute", top: "6px", right: "8px",
                 background: "transparent", border: "0",
                 fontSize: "26px", lineHeight: "1", cursor: "pointer", color: "#555",
                 padding: "4px 10px"
@@ -171,21 +180,21 @@
         }, ["×"]);
 
         var panel = h("div", {
+            "data-viewport": vp.narrow ? "narrow" : (vp.short ? "short" : "standard"),
             style: {
                 position: "relative",
                 background: "white",
-                // Width capped so the modal fits comfortably on a 854x480
-                // Wii U gamepad screen with margin on either side.
-                width: "min(560px, 92vw)",
+                width: panelWidth,
                 maxWidth: "780px",
                 maxHeight: "94vh",
+                minHeight: "220px",
                 borderRadius: "6px",
                 boxShadow: "0 6px 24px rgba(0,0,0,0.25)",
-                padding: "20px",
+                padding: panelPadding,
                 boxSizing: "border-box",
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
+                gap: panelGap,
                 fontFamily: "system-ui, sans-serif"
             }
         }, [
@@ -207,7 +216,9 @@
                 zIndex: "10000",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center"
+                justifyContent: "center",
+                padding: "8px",
+                boxSizing: "border-box"
             },
             onclick: function (e) {
                 if (e.target === root) { AR.R11.libraryUI.close(); }

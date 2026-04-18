@@ -51,5 +51,24 @@ AR.R11 = {
                 object[idx] = AR.R11.resolve(defaults[idx]);
             }
         }
+    },
+    // Classify the current viewport. Used by the DOM-based modals to
+    // choose between a docked side-panel layout (desktop, 4:3, Wii U
+    // landscape) and a full-sheet layout (mobile portrait).
+    //
+    //   narrow  — width < 640, not enough room to dock a side panel
+    //   short   — height < 520, squeeze vertical spacing (Wii U, mobile
+    //             landscape)
+    //   dock    — wide enough for the side panel pattern
+    viewportClass: function () {
+        var w = (typeof window !== "undefined") ? window.innerWidth : 1024,
+            h = (typeof window !== "undefined") ? window.innerHeight : 768;
+        return {
+            width: w,
+            height: h,
+            narrow: w < 640,
+            short: h < 520,
+            dock: w >= 640
+        };
     }
 };

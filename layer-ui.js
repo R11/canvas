@@ -135,13 +135,12 @@
         var total = layers.length;
 
         // Display order: top of composite (highest index) at the top of the
-        // panel, matching Photoshop convention.
+        // panel, matching Photoshop convention. The list flex-grows inside
+        // the panel so its scroll area scales with the available height.
         var list = h("ul", {
             style: {
                 margin: "0", padding: "0", listStyle: "none",
-                // Cap height for the 480px-tall Wii U gamepad screen so the
-                // Add/Duplicate row stays visible.
-                maxHeight: "260px", overflowY: "auto",
+                flex: "1 1 auto", minHeight: "80px", overflowY: "auto",
                 border: "1px solid #ddd", borderRadius: "3px"
             }
         });
@@ -187,26 +186,72 @@
     }
 
     function build() {
-        panelEl = h("div", {
-            role: "dialog",
-            "aria-label": "Layers",
-            style: {
-                position: "fixed",
-                top: "12px",
-                right: "12px",
-                // Width capped to leave canvas space on a 854x480 Wii U screen.
-                width: "min(360px, 90vw)",
-                background: "white",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                boxShadow: "0 3px 14px rgba(0,0,0,0.15)",
-                padding: "12px",
-                zIndex: "9999",
-                boxSizing: "border-box",
-                fontFamily: "system-ui, sans-serif"
-            }
-        });
-        root = panelEl;
+        var vp = AR.R11.viewportClass();
+        if (vp.dock) {
+            // Dock mode: fixed side panel on the right. Used on desktop,
+            // 4:3, and Wii U gamepad (854 wide).
+            panelEl = h("div", {
+                role: "dialog",
+                "aria-label": "Layers",
+                "data-viewport": vp.short ? "dock-short" : "dock",
+                style: {
+                    position: "fixed",
+                    top: "12px",
+                    right: "12px",
+                    width: "min(360px, 42vw)",
+                    maxHeight: "calc(100vh - 24px)",
+                    background: "white",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    boxShadow: "0 3px 14px rgba(0,0,0,0.15)",
+                    padding: vp.short ? "8px" : "12px",
+                    zIndex: "9999",
+                    boxSizing: "border-box",
+                    display: "flex",
+                    flexDirection: "column",
+                    fontFamily: "system-ui, sans-serif"
+                }
+            });
+            root = panelEl;
+        } else {
+            // Sheet mode: full overlay modal. Used when the viewport is too
+            // narrow to dock a side panel next to the canvas (mobile portrait).
+            panelEl = h("div", {
+                role: "dialog",
+                "aria-label": "Layers",
+                "data-viewport": "sheet",
+                style: {
+                    position: "relative",
+                    background: "white",
+                    width: "96vw",
+                    maxWidth: "480px",
+                    maxHeight: "94vh",
+                    borderRadius: "6px",
+                    boxShadow: "0 6px 24px rgba(0,0,0,0.25)",
+                    padding: "14px",
+                    boxSizing: "border-box",
+                    display: "flex",
+                    flexDirection: "column",
+                    fontFamily: "system-ui, sans-serif"
+                }
+            });
+            root = h("div", {
+                "data-layer-ui-backdrop": "true",
+                style: {
+                    position: "fixed", inset: "0",
+                    background: "rgba(0,0,0,0.4)",
+                    zIndex: "9999",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "8px",
+                    boxSizing: "border-box"
+                },
+                onclick: function (e) {
+                    if (e.target === root) { AR.R11.layerUI.close(); }
+                }
+            }, [panelEl]);
+        }
         document.body.appendChild(root);
     }
 
