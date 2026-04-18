@@ -1009,6 +1009,106 @@ AR.R11.draw = (function () {
                 opts = opts || {};
                 exportImage(opts.id || "realCanvas", opts.filename || "drawing.png");
             },
+            importPixels: function (pixelData, srcW, srcH, opts) {
+                // Replace or overlay the current drawing with a raw
+                // Uint8ClampedArray. `pixelData` length must be srcW*srcH*4.
+                //   opts.mode:          "replace" (default) or "overlay"
+                //   opts.resizeCanvas:  true (default) resizes the drawing
+                //                       surface to srcW x srcH when in
+                //                       replace mode; false leaves it alone
+                //                       and blits at the top-left.
+                opts = opts || {};
+                var mode = opts.mode || "replace",
+                    resize = (opts.resizeCanvas !== false) && (mode === "replace");
+                if (!(pixelData instanceof Uint8ClampedArray) &&
+                    !(pixelData && pixelData.length === srcW * srcH * 4)) {
+                    throw new Error("importPixels: pixelData must be a typed byte array sized srcW*srcH*4");
+                }
+                if (resize) {
+                    // Use setCanvasSize with preserve:false to start clean,
+                    // then blit the imported pixels in at (0, 0).
+                    this.setCanvasSize(srcW, srcH, { preserve: false });
+                }
+                var rCv = document.getElementById("realCanvas"),
+                    rCtx = rCv.getContext("2d"),
+                    copyW = Math.min(srcW, canvasW),
+                    copyH = Math.min(srcH, canvasH),
+                    dx, dy, sIdx, tIdx;
+                if (mode === "replace") {
+                    // Wipe realC and realCanvas before blitting.
+                    for (var i = 0; i < realC.length; i += 1) { realC[i] = 0; }
+                    rCtx.fillStyle = "white";
+                    rCtx.fillRect(0, 0, canvasW, canvasH);
+                }
+                for (dy = 0; dy < copyH; dy += 1) {
+                    for (dx = 0; dx < copyW; dx += 1) {
+                        sIdx = (dx + dy * srcW) * 4;
+                        tIdx = (dx + dy * canvasW) * 4;
+                        if (mode === "overlay" && pixelData[sIdx + 3] === 0) {
+                            continue;  // skip transparent pixels in overlay
+                        }
+                        realC[tIdx]     = pixelData[sIdx];
+                        realC[tIdx + 1] = pixelData[sIdx + 1];
+                        realC[tIdx + 2] = pixelData[sIdx + 2];
+                        realC[tIdx + 3] = pixelData[sIdx + 3];
+                        if (pixelData[sIdx + 3] !== 0) {
+                            rCtx.fillStyle = "rgba(" + pixelData[sIdx] + "," +
+                                pixelData[sIdx + 1] + "," + pixelData[sIdx + 2] +
+                                "," + pixelData[sIdx + 3] + ")";
+                            rCtx.fillRect(dx, dy, 1, 1);
+                        }
+                    }
+                }
+                // Repaint preview.
+                canvas.update();
+                canvas.shift(curX, curY);
+            },
+            importImage: function (fileOrBlob, opts) {
+                // Async import via browser decoding. Returns a Promise that
+                // resolves once the pixels have been blitted. Accepts File,
+                // Blob, or a data URL / object URL string.
+                var self = this;
+                return new Promise(function (resolve, reject) {
+                    var url, revokeAfter = false, img;
+                    if (typeof fileOrBlob === "string") {
+                        url = fileOrBlob;
+                    } else if (fileOrBlob && fileOrBlob instanceof window.Blob) {
+                        url = URL.createObjectURL(fileOrBlob);
+                        revokeAfter = true;
+                    } else {
+                        reject(new Error("importImage: argument must be a Blob, File, or URL string"));
+                        return;
+                    }
+                    img = new window.Image();
+                    img.onload = function () {
+                        try {
+                            // Rasterize into an offscreen canvas so we can
+                            // read ImageData.
+                            var off = document.createElement("canvas");
+                            off.width = img.width;
+                            off.height = img.height;
+                            var offCtx = off.getContext("2d");
+                            offCtx.drawImage(img, 0, 0);
+                            var data = offCtx.getImageData(0, 0, img.width, img.height).data;
+                            self.importPixels(data, img.width, img.height, opts);
+                            resolve({ width: img.width, height: img.height });
+                        } catch (err) {
+                            reject(err);
+                        } finally {
+                            if (revokeAfter) {
+                                try { URL.revokeObjectURL(url); } catch (ignore) {}
+                            }
+                        }
+                    };
+                    img.onerror = function () {
+                        if (revokeAfter) {
+                            try { URL.revokeObjectURL(url); } catch (ignore) {}
+                        }
+                        reject(new Error("importImage: failed to decode image"));
+                    };
+                    img.src = url;
+                });
+            },
             setCanvasSize: function (newW, newH, opts) {
                 opts = opts || {};
                 var preserve = (opts.preserve !== false),
