@@ -792,7 +792,7 @@ AR.R11.draw = (function () {
                 x = e.pageX;
                 y = e.pageY;
             
-               if (window.wiiu) {
+               if (window.wiiu && state) {
                    x = state.contentX;
                    y = state.contentY;
                }
@@ -816,24 +816,24 @@ AR.R11.draw = (function () {
             var event;
             if (window.wiiu) {
                 state = window.wiiu.gamepad.update();
-                if (!state.isEnabled || !state.isDataValid) {
+                if (!state || !state.isEnabled || !state.isDataValid) {
                     state = null;
                 }
-                if (state.tpValidity === 0) {
-                    if (state.tpTouch === 1) {
+                if (state && state.tpValidity === 0) {
+                    if (state.tpTouch === 1 && e) {
                         var x = e.pageX,
                             y = e.pageY;
                         canvas.draw(x, y);
                     }
                 }
-                if (state.rStickX !== 0 || state.rStickY !== 0) {
+                if (state && (state.rStickX !== 0 || state.rStickY !== 0)) {
                     canvas.shift(curX, curY); //  I need to ensure the canvasX and canvasY shift in the fillCanvas(?) function
                 }
-                if (state.lStickX !== 0 || state.lStickY !== 0) {
+                if (state && (state.lStickX !== 0 || state.lStickY !== 0)) {
                     picker.update();
                 }
             } else { state = new DummyData();}
-            event = e.keyCode || event.keyCode || controls.event || null;
+            event = (e && e.keyCode) || (controls && controls.event) || null;
             switch (event) {
             case 37: // left
                 curX -= shift;
@@ -948,7 +948,7 @@ AR.R11.draw = (function () {
                         flag["mousedown"] = 1;
                         touchCheck(e);
                     }
-                    window.setInterval(buttons(controls), 20);
+                    window.setInterval(function () { buttons(controls); }, 20);
                 } else {
                     if (ball && ball.setBall) { ball.setBall(200, 200); }
                     window.onkeydown = function (e) {

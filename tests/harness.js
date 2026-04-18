@@ -89,6 +89,22 @@ function makeDom({ scripts = ALL_SCRIPTS, excludeOnload = false } = {}) {
     };
     window.open = () => null;
 
+    // Capture setInterval/setTimeout callbacks instead of actually scheduling them.
+    // Otherwise the wiiu init branch keeps the jsdom event loop alive and the
+    // node test runner hangs forever.
+    window.__intervals = [];
+    window.__timeouts = [];
+    window.setInterval = function (fn, ms) {
+        window.__intervals.push({ fn, ms });
+        return window.__intervals.length;
+    };
+    window.setTimeout = function (fn, ms) {
+        window.__timeouts.push({ fn, ms });
+        return window.__timeouts.length;
+    };
+    window.clearInterval = () => undefined;
+    window.clearTimeout = () => undefined;
+
     // Inject each script as a <script> tag so it runs in the window's global scope
     // with `window`, `document`, etc. as free variables (matching browser semantics).
     for (const name of scripts) {
