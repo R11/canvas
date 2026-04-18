@@ -200,8 +200,12 @@ AR.R11.draw = (function () {
         drawReal = function (ctx, data, x, y, xbit, ybit) {
             var check, curPixel, a, b;
             ctx.save();
-            for (a = 0; a <= xbit; a += 1) {
-                for (b = 0; b <= ybit; b += 1) {
+            // `a < xbit` (not `<=`): the viewport covers exactly xbit cells
+            // horizontally. Iterating one extra column reads pixels outside
+            // the current view and paints them at the right edge, which
+            // looked like pixels "shifting" after a pan.
+            for (a = 0; a < xbit; a += 1) {
+                for (b = 0; b < ybit; b += 1) {
                     curPixel = getPixel(x + a, y + b);
                     check = data[curPixel + 3];
                     if (check !== 0) {
@@ -352,7 +356,16 @@ AR.R11.draw = (function () {
                         y;
                     
                     if (flag["mousedown"] === 1) {
-                        ctx.drawImage(rCanvas, x, y, xbit, ybit, 0, 0, w, h);
+                        // Destination size must be an integer multiple of the
+                        // source (xbit * zbit), otherwise drawImage uses a
+                        // fractional scale and each source pixel lands on a
+                        // subpixel boundary. After mouseup drawReal re-renders
+                        // with integer zbit scaling, snapping pixels to a
+                        // slightly different position — that mismatch was the
+                        // "pixels shifted after pan" bug.
+                        ctx.clearRect(0, 0, w, h);
+                        ctx.drawImage(rCanvas, x, y, xbit, ybit,
+                                      0, 0, xbit * zbit, ybit * zbit);
                         settings.updateXY(x, y, "red");
                         flag["loading"] = 1;
                     } else {

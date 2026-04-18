@@ -182,6 +182,45 @@ test('wiiu branch: invalid/disabled gamepad state is tolerated', () => {
     assert.doesNotThrow(() => window.onmousemove({ pageX: 100, pageY: 100 }));
 });
 
+test('pan after draw: pixel renders at the expected shifted grid cell', () => {
+    // At init: zoom=3, gz=3, zbit=8, range=1, bit=8, curX=409, curY=307
+    // (for jsdom's default 1024x768 viewport).
+    // Draw at (500, 400): gridX=62, gridY=50 -> pixel written to realC at
+    // real-coords (471, 357).
+    const { window, canvasCtx } = bootDraw();
+
+    window.onmousedown({ pageX: 500, pageY: 400 });
+    window.onmouseup({ pageX: 500, pageY: 400 });
+
+    // Pan right by one real pixel via the right-arrow keybinding (keyCode 39).
+    // After the pan curX=410; drawReal reads from realC starting at (410, 307),
+    // finds our pixel at (a=61, b=50) -> fillRect(488, 400, 8, 8).
+    const preCanvas = canvasCtx.__calls.length;
+    window.onkeydown({ keyCode: 39 });
+
+    const fills = canvasCtx.__calls.slice(preCanvas).filter(c => c.method === 'fillRect');
+    const ourPixel = fills.find(c => c.args[0] === 488 && c.args[1] === 400 &&
+                                     c.args[2] === 8 && c.args[3] === 8);
+    assert.ok(ourPixel, 'drawn pixel should land at (488, 400) after right-arrow pan');
+});
+
+test('drawReal no longer overshoots by a row/column after pan', () => {
+    const { window, canvasCtx } = bootDraw();
+
+    window.onmousedown({ pageX: 500, pageY: 400 });
+    window.onmouseup({ pageX: 500, pageY: 400 });
+
+    const preCanvas = canvasCtx.__calls.length;
+    window.onkeydown({ keyCode: 39 });
+
+    // xbit * zbit = 128 * 8 = 1024 (= w for jsdom default), ybit * zbit = 96 * 8 = 768 (= h).
+    // Before the fix, drawReal also painted a column at x=1024 and a row at y=768.
+    const fills = canvasCtx.__calls.slice(preCanvas).filter(c => c.method === 'fillRect');
+    const overshoot = fills.filter(c => c.args[0] >= 1024 || c.args[1] >= 768);
+    assert.strictEqual(overshoot.length, 0,
+        'drawReal should not paint cells at or past xbit*zbit / ybit*zbit');
+});
+
 test('mouseup clears mousedown flag (second click is independent)', () => {
     const { window, realCtx } = bootDraw();
 
